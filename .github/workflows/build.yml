@@ -1,0 +1,27 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
+        configuration: [Debug, Release]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Configure CMake
+      run: cmake --preset vs2022-win32
+
+    - name: Build
+      run: cmake --build --preset vs2022-win32-${{ matrix.configuration == 'Debug' && 'debug' || 'release' }}
+
+    - name: Test
+      run: ctest --preset vs2022-win32-${{ matrix.configuration == 'Debug' && 'debug' || 'release' }}

@@ -35,6 +35,7 @@ set(SPACEMONGER_SOURCES
   lang_en.cpp
   lang_fr.cpp
   Mainfrm.cpp
+  PathUtil.cpp
   SetupDlg.cpp
   SpaceMonger.cpp
   StdAfx.cpp
@@ -47,10 +48,12 @@ target_include_directories(SpaceMonger PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(SpaceMonger PRIVATE WIN32 _WINDOWS _MBCS)
 target_compile_options(SpaceMonger PRIVATE /W3 /EHsc)
 target_precompile_headers(SpaceMonger PRIVATE Stdafx.h)
+set_source_files_properties(PathUtil.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 set_target_properties(SpaceMonger PROPERTIES
   MFC_FLAG 1
   MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
 )
+
 
 add_executable(DiskUsage_test
   tests/DiskUsage_test.cpp
@@ -64,3 +67,17 @@ set_target_properties(DiskUsage_test PROPERTIES
   MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
 )
 add_test(NAME DiskUsage_test COMMAND DiskUsage_test)
+
+add_executable(PathUtil_test
+  tests/PathUtil_test.cpp
+  PathUtil.cpp
+  PathUtil.h
+)
+target_include_directories(PathUtil_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(PathUtil_test PRIVATE WIN32 _WINDOWS _MBCS)
+target_compile_options(PathUtil_test PRIVATE /W3 /EHsc)
+set_target_properties(PathUtil_test PROPERTIES
+  MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+)
+add_test(NAME PathUtil_test COMMAND PathUtil_test)
+

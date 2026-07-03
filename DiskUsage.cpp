@@ -78,3 +78,39 @@ int SM_LoadFileSizeInfo(const char *path, const WIN32_FIND_DATA *finddata, SM_FI
 
 	return 1;
 }
+
+typedef DWORD (WINAPI *SM_GetCompressedFileSizeWFunc)(LPCWSTR filename, LPDWORD high_size);
+
+int SM_LoadFileSizeInfoW(const wchar_t *path, const WIN32_FIND_DATAW *finddata, SM_FILE_SIZE_INFO *info)
+{
+	DWORD high_size = 0;
+	DWORD low_size;
+	HMODULE kernel;
+	SM_GetCompressedFileSizeWFunc get_compressed_size;
+
+	if (path == NULL || finddata == NULL || info == NULL)
+		return 0;
+
+	info->logical_size = SM_MakeFileSize(finddata->nFileSizeLow, finddata->nFileSizeHigh);
+	info->allocated_size = 0;
+	info->attributes = finddata->dwFileAttributes;
+	info->has_allocated_size = 0;
+
+	kernel = GetModuleHandle("KERNEL32.DLL");
+	if (kernel == NULL)
+		return 1;
+
+	get_compressed_size = (SM_GetCompressedFileSizeWFunc)GetProcAddress(kernel, "GetCompressedFileSizeW");
+	if (get_compressed_size == NULL)
+		return 1;
+
+	SetLastError(ERROR_SUCCESS);
+	low_size = get_compressed_size(path, &high_size);
+	if (low_size != 0xFFFFFFFFUL || GetLastError() == ERROR_SUCCESS) {
+		info->allocated_size = SM_MakeFileSize(low_size, high_size);
+		info->has_allocated_size = 1;
+	}
+
+	return 1;
+}
+

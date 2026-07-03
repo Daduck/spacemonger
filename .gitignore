@@ -3,3 +3,5 @@
 build/
 Debug/
 Release/
+*.ncb
+*.opt

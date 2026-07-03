@@ -3,6 +3,7 @@
 #include "FolderView.h"
 #include "MainFrm.h"
 #include "TipWnd.h"
+#include "PathUtil.h"
 #include "Lang.h"
 
 IMPLEMENT_DYNCREATE(CFolderView, CFreeView)
@@ -363,9 +364,13 @@ void CFolderView::SetupInfoTip(CDisplayFolder *cur)
 	path += tempstring;
 
 	// Load in the file's information using FindFirstFile.
-	WIN32_FIND_DATA info;
-	HANDLE handle = FindFirstFile(path+cur->source->names[cur->index], &info);
+	WIN32_FIND_DATAW info;
+	std::wstring fullPath = PathUtil::AnsiToWide((const char*)(path + cur->source->names[cur->index]));
+	std::wstring preparedPath = PathUtil::PrepareLongPath(fullPath);
+	HANDLE handle = FindFirstFileW(preparedPath.c_str(), &info);
 	FindClose(handle);
+
+
 
 	if (theApp.m_settings.infotip_flags & TIP_PATH)
 		string += path;
@@ -723,7 +728,6 @@ void CFolderView::MinimalDrawDisplayFolder(CDC *pDC, CDisplayFolder *cur, BOOL s
 			// There's only one free-space block, so we can afford to
 			// be a little less efficient with it.
 			CFolderTree *ft = (CFolderTree *)GetDocument();
-			char buffer[256];
 			CString string;
 			ui64 ts = ft->totalspace;
 			if (ts <= 1) ts = 1;
@@ -733,12 +737,15 @@ void CFolderView::MinimalDrawDisplayFolder(CDC *pDC, CDisplayFolder *cur, BOOL s
 			if (size.cx > w-2) tx = x + 2;
 			else tx = x + (w - size.cx) / 2;
 			pDC->TextOut(tx, ty-18, string);
-			strcpy(buffer, GetSizeString(ft->freespace, ft->totalspace, 0)+" "+CurLang->free);
-			pDC->TextOut(tx, ty-6, buffer, strlen(buffer));
-			sprintf(buffer, CString(CurLang->files_total)+"  %u", ft->numfiles);
-			pDC->TextOut(tx, ty+6, buffer, strlen(buffer));
-			sprintf(buffer, CString(CurLang->folders_total)+"  %u", ft->numfolders);
-			pDC->TextOut(tx, ty+15, buffer, strlen(buffer));
+
+			string = GetSizeString(ft->freespace, ft->totalspace, 0) + " " + CurLang->free;
+			pDC->TextOut(tx, ty-6, string);
+			
+			string.Format("%s  %u", (const char*)CString(CurLang->files_total), ft->numfiles);
+			pDC->TextOut(tx, ty+6, string);
+			
+			string.Format("%s  %u", (const char*)CString(CurLang->folders_total), ft->numfolders);
+			pDC->TextOut(tx, ty+15, string);
 		}
 		else {
 			if (sel) pDC->SetTextColor(RGB(0xFF,0xFF,0xFF));

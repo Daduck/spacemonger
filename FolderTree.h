@@ -2,6 +2,15 @@
 #ifndef FOLDERTREE_H
 #define FOLDERTREE_H
 
+#ifdef bool
+#pragma push_macro("bool")
+#undef bool
+#include <string>
+#pragma pop_macro("bool")
+#else
+#include <string>
+#endif
+
 class CFolderTree;
 class CFolderDialog;
 struct CFolder;
@@ -27,7 +36,8 @@ private:
 	void EightBitCountingSort(ui64 *dsize, ui64 *ssize, ui32 count, ui32 bitpos,
 		char **dnames, char **snames, CFolder **dkids, CFolder **skids,
 		ui64 *dasize, ui64 *sasize, ui64 *dtimes, ui64 *stimes);
-	BOOL LoadFolder(CFolderTree *tree, char *name, ui32 namelen, ui64 clustersize, BOOL aligned, CFolderDialog *dialog);
+	BOOL LoadFolder(CFolderTree *tree, const std::wstring& path, ui64 clustersize, BOOL aligned, CFolderDialog *dialog);
+
 
 public:
 	CFolder *parent;

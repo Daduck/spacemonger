@@ -295,13 +295,13 @@ static LRESULT CALLBACK TipWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 		}
 		info->textlen = strlen((const char *)lParam);
 		info->text = (char *)malloc(info->textlen+1);
-		strcpy(info->text, (const char *)lParam);
+		strcpy_s(info->text, info->textlen+1, (const char *)lParam);
 		::RedrawWindow(hwnd, NULL, NULL, RDW_ERASE|RDW_INTERNALPAINT);
 		return 0;
 
 	case WM_GETTEXT:
 		if (lParam != NULL) {
-			strncpy((char *)lParam, info->text, (int)wParam);
+			strncpy_s((char *)lParam, (int)wParam, info->text, _TRUNCATE);
 			((char *)lParam)[wParam-1] = '\0';
 			if ((int)wParam > (int)info->textlen) return (LRESULT)info->textlen;
 			else return (LRESULT)wParam;

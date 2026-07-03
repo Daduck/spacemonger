@@ -29,6 +29,14 @@
       "output": {
         "outputOnFailure": true
       }
+    },
+    {
+      "name": "vs2022-win32-release",
+      "configurePreset": "vs2022-win32",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
     }
   ]
 }

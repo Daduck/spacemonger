@@ -125,7 +125,7 @@ void CDriveInfo::LoadDriveInfo(char let)
 		letter = let;
 		icon = fileinfo.hIcon;
 		longname = new char[strlen(fileinfo.szDisplayName)+1];
-		strcpy(longname, fileinfo.szDisplayName);
+		strcpy_s(longname, strlen(fileinfo.szDisplayName)+1, fileinfo.szDisplayName);
 	}
 	else {
 		avail = 0;

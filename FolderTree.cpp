@@ -3,6 +3,7 @@
 #include "spacemonger.h"
 #include "FolderTree.h"
 #include "DiskUsage.h"
+#include "PathUtil.h"
 #include "Lang.h"
 
 #include <io.h>
@@ -12,31 +13,8 @@
 #include <winioctl.h>
 
 //////////////////////////////////////////////////////////////////////////////
-//  Reparse points are utterly undocumented in Win2K, but can wreak havoc
-//  in SpaceMonger.  We try hard to deal with them anyway.
+//  Reparse points are handled via WIN32_FIND_DATA dwReserved0 in modern Windows.
 
-#if (_WIN32_WINNT < 0x500)
-
-//  Maximum reparse buffer info size. The max user defined reparse
-//  data is 16KB, plus there's a header.
-//
-#define MAX_REPARSE_SIZE	17000
-
-//  Undocumented FSCTL_SET_REPARSE_POINT structure definition
-#define REPARSE_MOUNTPOINT_HEADER_SIZE   8
-typedef struct {
-    DWORD          ReparseTag;
-    DWORD          ReparseDataLength;
-    WORD           Reserved;
-    WORD           ReparseTargetLength;
-    WORD           ReparseTargetMaximumLength;
-    WORD           Reserved1;
-    WCHAR          ReparseTarget[1];
-} REPARSE_MOUNTPOINT_DATA_BUFFER, *PREPARSE_MOUNTPOINT_DATA_BUFFER;
-
-#define FSCTL_GET_REPARSE_POINT CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 42, METHOD_BUFFERED, FILE_ANY_ACCESS) // , REPARSE_DATA_BUFFER
-
-#endif
 
 //////////////////////////////////////////////////////////////////////////////
 
@@ -364,14 +342,17 @@ static ui32 strxcpy(char *dest, const char *src)
 
 BOOL CFolder::LoadFolderInitial(CFolderTree *tree, const char *name, ui64 clustersize, CFolderDialog *dialog)
 {
-	// First, fix up the pathname so that it's canonical and complete.
-	int len;
-	char path[MAX_PATH+270];
-	_fullpath(path, name, MAX_PATH);
-	if (dialog != NULL)
-		dialog->SetPath(tree, path, this);
-	if ((len = strlen(path)) < 1 || path[len-1] != '\\')
-		path[len++] = '\\';
+	// Convert input name to Wide path
+	std::wstring widePath = PathUtil::AnsiToWide(name);
+	
+	// Resolve absolute path
+	std::wstring absPath = PathUtil::GetAbsolutePath(widePath);
+	absPath = PathUtil::EnsureTrailingBackslash(absPath);
+	
+	if (dialog != NULL) {
+		std::string ansiAbsPath = PathUtil::WideToAnsi(absPath);
+		dialog->SetPath(tree, ansiAbsPath.c_str(), this);
+	}
 
 	// Next, compute a bit-field to use when computing the cluster size.  This
 	// saves us the work of having to do a real modulus later on.
@@ -388,108 +369,87 @@ BOOL CFolder::LoadFolderInitial(CFolderTree *tree, const char *name, ui64 cluste
 	while (clusterbits--) clustermod <<= 1;
 	aligned = (clustermod == clustersize);
 
-	// Thus aligned will be set to TRUE if clustersize is a power of two,
-	// which, if it is, it saves a lot of computation work by letting us use
-	// bitwise-and instead of true modulus.  We also subtract 1 from the
-	// cluster size here because it saves extra work in the recursive part.
-
-	return LoadFolder(tree, path, len, clustersize-1, aligned, dialog);
+	return LoadFolder(tree, absPath, clustersize-1, aligned, dialog);
 }
 
-BOOL CFolder::LoadFolder(CFolderTree *tree, char *name, ui32 namelen, ui64 clustersize, BOOL aligned, CFolderDialog *dialog)
+BOOL CFolder::LoadFolder(CFolderTree *tree, const std::wstring& path, ui64 clustersize, BOOL aligned, CFolderDialog *dialog)
 {
-	WIN32_FIND_DATA finddata;
+	WIN32_FIND_DATAW finddata;
 	BOOL gotfile;
 	HANDLE handle;
 	ui64 size;
 	static DWORD last_tick = 0;
-	ui32 newlen;
 
-	name[namelen] = '*';
-	name[namelen+1] = '.';
-	name[namelen+2] = '*';
-	name[namelen+3] = '\0';
+	// Use our new PathUtil to safely construct search path
+	std::wstring searchPattern = PathUtil::Join(path, L"*.*");
+	std::wstring preparedSearchPattern = PathUtil::PrepareLongPath(searchPattern);
 
-	// "name" now contains something like "C:\Windows\System\*.*"
-
-	handle = FindFirstFile(name, &finddata);
+	handle = FindFirstFileW(preparedSearchPattern.c_str(), &finddata);
 	gotfile = (handle != INVALID_HANDLE_VALUE);
 	while (gotfile && !dialog->cancelled) {
-		newlen = namelen + strxcpy(name+namelen, finddata.cFileName);
-
-		// Handle (i.e., IGNORE) any junction points, mount points, or symbolic links.
-		// This is a lot messier than it would be with Unix soft-links, but a lot
-		// simpler than Unix mount points.
-		if (finddata.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) {
-
-			// Open a handle to the object.  This should never be able to fail.
-			HANDLE fileHandle = CreateFile(name, 0, FILE_SHARE_READ, NULL,
-						OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, 0);
-
-			// Retrieve the reparse information for the object.
-			BYTE reparseBuffer[MAXIMUM_REPARSE_DATA_BUFFER_SIZE];
-			PREPARSE_GUID_DATA_BUFFER reparseInfo = (PREPARSE_GUID_DATA_BUFFER)reparseBuffer;
-			DWORD returnedLength;
-			DWORD result = DeviceIoControl(fileHandle, FSCTL_GET_REPARSE_POINT,
-					NULL, 0, reparseInfo, sizeof(reparseBuffer),
-					&returnedLength, NULL);
-
-			if (result) {
-				// If the reparse information indicated this was a mount point, junction
-				// point, or symbolic link, skip the file.  Its size will be small enough
-				// that failing to factor it into the overall size computations will not
-				// yield invalid results.
-				ULONG msresult = IsReparseTagMicrosoft(reparseInfo->ReparseTag);
-				if (msresult) {
-					switch (reparseInfo->ReparseTag) {
-					case IO_REPARSE_TAG_SYMLINK:
-					case IO_REPARSE_TAG_MOUNT_POINT:
-						CloseHandle(fileHandle);
-						goto nextfile;
-					}
-				}
+		// Ignore "." and ".."
+		if (finddata.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+			if (finddata.cFileName[0] == L'.' && (finddata.cFileName[1] == L'\0'
+					|| (finddata.cFileName[1] == L'.' && finddata.cFileName[2] == L'\0'))) {
+				goto nextfile;
 			}
-			CloseHandle(fileHandle);
 		}
 
-		// Process directories, except for the ".." directory.
-		if (finddata.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-			if (!(finddata.cFileName[0] == '.' && (finddata.cFileName[1] == '\0'
-					|| (finddata.cFileName[1] == '.' && finddata.cFileName[2] == '\0')))) {
-				if (dialog != NULL)
-					dialog->IncFolders();
-				name[newlen++] = '\\';
-				name[newlen] = '\0';
-				CFolder *newfolder = new CFolder;
-				newfolder->LoadFolder(tree, name, newlen, clustersize, aligned, dialog);
-				AddFolder(tree, finddata.cFileName, newlen-namelen-1, newfolder,
-					*(ui64 *)&finddata.ftLastWriteTime);
+		// Handle (i.e., IGNORE) any junction points, mount points, or symbolic links.
+		if (finddata.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) {
+			// In modern Windows, WIN32_FIND_DATA's dwReserved0 contains the reparse tag
+			// if FILE_ATTRIBUTE_REPARSE_POINT is set.
+			DWORD reparseTag = finddata.dwReserved0;
+			
+			// If it's a name surrogate (e.g. symlink, mount point), we should not traverse it
+			// or count it as local disk space to avoid double-counting or infinite loops.
+			// Cloud placeholders (OneDrive) are NOT name surrogates and will safely fall through.
+			if (IsReparseTagNameSurrogate(reparseTag)) {
+				goto nextfile;
 			}
+		}
+
+		// Process directories
+		if (finddata.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+			if (dialog != NULL)
+				dialog->IncFolders();
+			std::wstring nextPath = PathUtil::Join(path, finddata.cFileName);
+			CFolder *newfolder = new CFolder;
+			newfolder->LoadFolder(tree, nextPath, clustersize, aligned, dialog);
+
+			std::string ansiName = PathUtil::WideToAnsi(finddata.cFileName);
+			AddFolder(tree, ansiName.c_str(), (ui32)ansiName.size(), newfolder,
+				*(ui64 *)&finddata.ftLastWriteTime);
 		}
 		else {
 			// Process files.
 			if (dialog != NULL) dialog->IncFiles();
+			
+			std::wstring filePath = PathUtil::Join(path, finddata.cFileName);
+			std::wstring preparedFilePath = PathUtil::PrepareLongPath(filePath);
+
 			SM_FILE_SIZE_INFO sizeinfo;
-			SM_LoadFileSizeInfo(name, &finddata, &sizeinfo);
+			SM_LoadFileSizeInfoW(preparedFilePath.c_str(), &finddata, &sizeinfo);
+
 			ui64 actualsize = (ui64)SM_GetLogicalFileSize(&sizeinfo);
 			size = (ui64)SM_ChooseDisplayedFileSize(&sizeinfo, clustersize, aligned);
-			AddFile(tree, finddata.cFileName, newlen-namelen, size, actualsize,
+			
+			std::string ansiName = PathUtil::WideToAnsi(finddata.cFileName);
+			AddFile(tree, ansiName.c_str(), (ui32)ansiName.size(), size, actualsize,
 				*(ui64 *)&finddata.ftLastWriteTime);
 		}
 
 	nextfile:
-		gotfile = FindNextFile(handle, &finddata);
+		gotfile = FindNextFileW(handle, &finddata);
 
 		// Only poll the system event queue every 1/5 of a second or so.
-		// That's enough to ensure quick response, but it won't bog
-		// down the scan.
 		DWORD tick = ::GetTickCount();
 		if (tick > last_tick + 200) {
 			last_tick = tick;
 			MSG msg;
 			if (dialog != NULL) {
-				name[namelen] = '\0';
-				dialog->SetPath(tree, name, this);
+				std::string ansiPath = PathUtil::WideToAnsi(PathUtil::EnsureTrailingBackslash(path));
+				dialog->SetPath(tree, ansiPath.c_str(), this);
 			}
 			while (::PeekMessage(&msg, 0, 0, 0, PM_REMOVE)) {
 				::TranslateMessage(&msg);
@@ -502,6 +462,7 @@ BOOL CFolder::LoadFolder(CFolderTree *tree, char *name, ui32 namelen, ui64 clust
 
 	return !dialog->cancelled;
 }
+
 
 void CFolder::DelFile(unsigned int index)
 {

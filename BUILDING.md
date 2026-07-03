@@ -38,7 +38,7 @@ Open `build/vs2022-win32/SpaceMonger.sln` after running:
 cmake --preset vs2022-win32
 ```
 
-Do not open `SpaceMonger.dsw` in modern Visual Studio as the primary workflow;
+Do not open `legacy/SpaceMonger.dsw` in modern Visual Studio as the primary workflow;
 it is the historical Visual C++ 6 workspace.
 
 ## VS Code

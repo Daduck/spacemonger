@@ -172,13 +172,11 @@ void CSpaceMonger::OnFileDelete(void)
 		isfolder = 1;
 	else isfolder = 0;
 
-	char source[MAX_PATH+8];
-	int len;
-
-	strcpy(source, title);
-	len = strlen(source);
+	int len = title.GetLength();
+	char *source = new char[len + 2];
+	strcpy_s(source, len + 2, title);
 	source[len] = '\0';
-	source[len+1] = '\0';
+	source[len + 1] = '\0';
 
 	SHFILEOPSTRUCT fop;
 	fop.hwnd = m_mainframe->m_hWnd;
@@ -192,8 +190,10 @@ void CSpaceMonger::OnFileDelete(void)
 
 	if (SHFileOperation(&fop) != 0 || fop.fAnyOperationsAborted) {
 		AfxMessageBox("Windows failed to delete file.");
+		delete[] source;
 		return;
 	}
+	delete[] source;
 
 	if (isfolder) {
 		delete fv->selected->source->children[fv->selected->index];
