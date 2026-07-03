@@ -46,3 +46,13 @@ it is the historical Visual C++ 6 workspace.
 Open the folder and use the CMake Tools extension with the
 `vs2022-win32` preset, or run the command-line steps from the integrated
 terminal.
+
+The checked-in VS Code tasks mirror the CMake commands:
+
+- `CMake: configure VS 2022 Win32`
+- `CMake: build Debug`
+- `CMake: build Release`
+- `CMake: test Debug`
+
+The C/C++ extension configuration delegates IntelliSense setup to CMake Tools
+so local MSVC and Windows SDK paths do not need to be committed.
