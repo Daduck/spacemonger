@@ -177,7 +177,7 @@ static char *cpp_strdup(const char *string, int stringlen)
 CFolder::CFolder()
 {
 	cur = 0;
-	max = 2;
+	max = 32;
 	names = (char **)malloc(sizeof(char *) * max);
 	sizes = (ui64 *)malloc(sizeof(ui64) * max);
 	actualsizes = (ui64 *)malloc(sizeof(ui64) * max);

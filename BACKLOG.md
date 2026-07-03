@@ -28,7 +28,7 @@ incremental modernization rather than a full rewrite.
 
 ## Performance Optimizations
 
-- [ ] Increase `CFolder` initial array capacity (from `max = 2` to `16` or `32`) to eliminate thousands of `malloc`/`memcpy` reallocations.
+- [x] Increase `CFolder` initial array capacity (from `max = 2` to `16` or `32`) to eliminate thousands of `malloc`/`memcpy` reallocations.
 - [ ] Implement an Arena Allocator (Memory Pool) for filenames to prevent tiny heap fragmentation during large drive scans.
 - [ ] Use adaptive sorting in `CFolder::Finalize` (e.g., `std::sort` for small folders instead of an 8-pass Radix sort).
 - [ ] Store internal strings as `wchar_t*` instead of `char*` to eliminate `PathUtil::WideToAnsi` conversion overhead during scanning.
