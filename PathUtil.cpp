@@ -153,4 +153,22 @@ std::wstring::size_type AppendComponent(std::wstring& path, const wchar_t *compo
 	return originalLength;
 }
 
+std::wstring BuildWidePath(const char *root, const std::wstring& relativePath, const wchar_t *leafName) {
+	std::wstring path = AnsiToWide(root == NULL ? "" : root);
+	std::wstring relative = NormalizeSeparators(relativePath);
+
+	path = NormalizeSeparators(path);
+	if (!relative.empty()) {
+		if (!path.empty() && path.back() != L'\\' && relative.front() != L'\\') {
+			path += L'\\';
+		} else if (!path.empty() && path.back() == L'\\' && relative.front() == L'\\') {
+			relative.erase(0, 1);
+		}
+		path += relative;
+	}
+
+	AppendComponent(path, leafName);
+	return path;
+}
+
 } // namespace PathUtil

@@ -5,7 +5,7 @@
 #include "TipWnd.h"
 
 struct CDisplayFolder {
-	char *name;
+	wchar_t *name;
 	si32 depth;
 	ui32 flags;				// 1=folder
 	CFolder *source;
@@ -45,6 +45,9 @@ public:
 	void UpdateTitleBar(void);
 
 	void SelectFolder(CDisplayFolder *cur);
+	void BuildTitleReverseW(CFolder *folder, std::wstring& string);
+	std::wstring BuildItemPathW(CDisplayFolder *folder);
+	std::wstring BuildContainerPathW(CDisplayFolder *folder);
 
 	//{{AFX_VIRTUAL(CFolderView)
 protected:

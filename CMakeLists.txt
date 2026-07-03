@@ -81,3 +81,14 @@ set_target_properties(PathUtil_test PROPERTIES
 )
 add_test(NAME PathUtil_test COMMAND PathUtil_test)
 
+add_executable(StringArena_test
+  tests/StringArena_test.cpp
+  StringArena.h
+)
+target_include_directories(StringArena_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(StringArena_test PRIVATE WIN32 _WINDOWS _MBCS)
+target_compile_options(StringArena_test PRIVATE /W3 /EHsc)
+set_target_properties(StringArena_test PROPERTIES
+  MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+)
+add_test(NAME StringArena_test COMMAND StringArena_test)

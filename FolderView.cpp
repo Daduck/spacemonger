@@ -280,12 +280,9 @@ void CFolderView::OnLButtonDblClk(UINT flags, CPoint point)
 	if (cur != NULL) {
 		if (cur->flags & 1) ZoomIn(cur);
 		else {
-			CString title, path;
-			title += ((CFolderTree *)GetDocument())->m_path;
-			BuildTitleReverse(selected->source, title);
-			path = title;
-			title += selected->source->names[selected->index];
-			ShellExecute(NULL, NULL, title, NULL, path, SW_SHOWDEFAULT);
+			std::wstring title = BuildItemPathW(selected);
+			std::wstring path = BuildContainerPathW(selected);
+			ShellExecuteW(NULL, NULL, title.c_str(), NULL, path.c_str(), SW_SHOWDEFAULT);
 		}
 	}
 	lastcur = NULL;
@@ -354,28 +351,29 @@ void CFolderView::SetupInfoTip(CDisplayFolder *cur)
 		return;
 	}
 
-	CString path;
-	CString string, tempstring;
+	CString string;
 
 	// Get the full pathname to the file.
 	CFolderTree *ft = (CFolderTree *)GetDocument();
-	path += ft->m_path;
-	BuildTitleReverse(cur->source, tempstring);
-	path += tempstring;
+	std::wstring wideRelativePath;
+	BuildTitleReverseW(cur->source, wideRelativePath);
+	std::wstring widePath = PathUtil::BuildWidePath(ft->m_path, wideRelativePath, cur->source->names[cur->index]);
+	CString path = PathUtil::WideToAnsi(PathUtil::BuildWidePath(ft->m_path, wideRelativePath, NULL)).c_str();
 
 	// Load in the file's information using FindFirstFile.
 	WIN32_FIND_DATAW info;
-	std::wstring fullPath = PathUtil::AnsiToWide((const char*)(path + cur->source->names[cur->index]));
-	std::wstring preparedPath = PathUtil::PrepareLongPath(fullPath);
+	memset(&info, 0, sizeof(info));
+	std::wstring preparedPath = PathUtil::PrepareLongPath(widePath);
 	HANDLE handle = FindFirstFileW(preparedPath.c_str(), &info);
-	FindClose(handle);
+	if (handle != INVALID_HANDLE_VALUE)
+		FindClose(handle);
 
 
 
 	if (theApp.m_settings.infotip_flags & TIP_PATH)
 		string += path;
 	if (theApp.m_settings.infotip_flags & TIP_NAME)
-		string += cur->source->names[cur->index];
+		string += PathUtil::WideToAnsi(cur->source->names[cur->index]).c_str();
 	if (theApp.m_settings.infotip_flags & (TIP_NAME|TIP_PATH))
 		string += '\n';
 	if (theApp.m_settings.infotip_flags & TIP_SIZE)
@@ -402,10 +400,10 @@ void CFolderView::SetupInfoTip(CDisplayFolder *cur)
 		string += '\n';
 	}
 	if (theApp.m_settings.infotip_flags & TIP_ICON) {
-		SHFILEINFO fileinfo;
-		memset(&fileinfo, sizeof(SHFILEINFO), 0);
-		SHGetFileInfo(path+cur->source->names[cur->index], 0,
-			&fileinfo, sizeof(SHFILEINFO), SHGFI_DISPLAYNAME|SHGFI_ICON);
+		SHFILEINFOW fileinfo;
+		memset(&fileinfo, 0, sizeof(SHFILEINFOW));
+		SHGetFileInfoW(preparedPath.c_str(), 0,
+			&fileinfo, sizeof(SHFILEINFOW), SHGFI_DISPLAYNAME|SHGFI_ICON);
 		m_infotipwnd.SetIcon(fileinfo.hIcon, 1);
 		m_infotipwnd.SetIconPos(TW_LEFT);
 	}
@@ -429,7 +427,9 @@ void CFolderView::SetupNameTip(CDisplayFolder *cur)
 	pDC->SelectPalette(&m_palette, 0);
 
 	int tx, ty, failed = 0;
-	CSize size = pDC->GetTextExtent(cur->name, strlen(cur->name));
+	int len = wcslen(cur->name);
+	CSize size;
+	::GetTextExtentPoint32W(pDC->GetSafeHdc(), cur->name, len, &size);
 	int x = cur->x, y = cur->y, w = cur->w + 1, h = cur->h + 1;
 	if (size.cx > w - 2) tx = x + 2;
 	else if (cur->flags & 1) tx = x + 2, failed++;
@@ -454,7 +454,7 @@ void CFolderView::SetupNameTip(CDisplayFolder *cur)
 		m_nametipwnd.SetBgColor(BoxColors[cur->depth & 7]);
 		m_nametipwnd.SetTextColor(RGB(0,0,0));
 	}
-	m_nametipwnd.SetWindowText(cur->name);
+	::SetWindowTextW(m_nametipwnd.m_hWnd, cur->name);
 	m_nametipwnd.AutoSize();
 	m_nametipwnd.MoveWindow(this, tx-2, ty-1);
 	m_nametipwnd.PushOnScreen();
@@ -597,7 +597,7 @@ void CFolderView::UpdateTitleBar(void)
 	if (selected != NULL && selected->name != NULL) {
 		if (ft != NULL) title += ft->m_path;
 		BuildTitleReverse(selected->source, title);
-		title += selected->source->names[selected->index];
+		title += PathUtil::WideToAnsi(selected->source->names[selected->index]).c_str();
 		size = selected->source->sizes[selected->index];
 		title += "  -  " + GetSizeString(size, ft->totalspace, 1)
 			+ "  -  " + GetSizeString(size, ft->totalspace, 0) + "  -  ";
@@ -623,8 +623,45 @@ void CFolderView::BuildTitleReverse(CFolder *folder, CString &string)
 		BuildTitleReverse(folder->parent, string);
 	if (folder->parent == NULL) return;
 
-	string += folder->parent->names[folder->parentindex];
+	string += PathUtil::WideToAnsi(folder->parent->names[folder->parentindex]).c_str();
 	string += "\\";
+}
+
+void CFolderView::BuildTitleReverseW(CFolder *folder, std::wstring& string)
+{
+	if (folder->parent != NULL)
+		BuildTitleReverseW(folder->parent, string);
+	if (folder->parent == NULL) return;
+
+	PathUtil::AppendComponent(string, folder->parent->names[folder->parentindex]);
+	if (!string.empty() && string.back() != L'\\')
+		string += L'\\';
+}
+
+std::wstring CFolderView::BuildContainerPathW(CDisplayFolder *folder)
+{
+	CFolderTree *tree = (CFolderTree *)GetDocument();
+	std::wstring relativePath;
+
+	if (folder != NULL)
+		BuildTitleReverseW(folder->source, relativePath);
+
+	return PathUtil::BuildWidePath(tree == NULL ? "" : tree->m_path, relativePath, NULL);
+}
+
+std::wstring CFolderView::BuildItemPathW(CDisplayFolder *folder)
+{
+	CFolderTree *tree = (CFolderTree *)GetDocument();
+	std::wstring relativePath;
+	const wchar_t *leafName = NULL;
+
+	if (folder != NULL) {
+		BuildTitleReverseW(folder->source, relativePath);
+		if (folder->source != NULL && folder->index != (ui32)-1)
+			leafName = folder->source->names[folder->index];
+	}
+
+	return PathUtil::BuildWidePath(tree == NULL ? "" : tree->m_path, relativePath, leafName);
 }
 
 void CFolderView::OnDraw(CDC *pDC)
@@ -714,11 +751,11 @@ void CFolderView::MinimalDrawDisplayFolder(CDC *pDC, CDisplayFolder *cur, BOOL s
 		rgn.CreateRectRgn(x, y, x + w, y + h);
 		pDC->SelectClipRgn(&rgn);
 
-		int len = strlen(cur->name);
+		int len = wcslen(cur->name);
 		CSize size;
 		int tx, ty;
 
-		size = pDC->GetTextExtent(cur->name, len);
+		::GetTextExtentPoint32W(pDC->GetSafeHdc(), cur->name, len, &size);
 		if (size.cx > w - 2 || (cur->flags & 1)) tx = x + 2;
 		else tx = x + (w - size.cx) / 2;
 		if (size.cy > h - 2 || (cur->flags & 1)) ty = y + 1;
@@ -767,7 +804,7 @@ void CFolderView::MinimalDrawDisplayFolder(CDC *pDC, CDisplayFolder *cur, BOOL s
 				else pDC->TextOut(x+(w-size.cx)/2, ty+11, string);
 				ty -= 12;
 			}
-			pDC->TextOut(tx, ty, cur->name, len);
+			::TextOutW(pDC->GetSafeHdc(), tx, ty, cur->name, len);
 			if (sel) pDC->SetTextColor(RGB(0,0,0));
 		}
 		pDC->SelectClipRgn(NULL);
@@ -841,7 +878,7 @@ CDisplayFolder *CFolderView::AddDisplayFolder(CFolder *source, ui32 index,
 	si32 depth, si16 x, si16 y, si16 w, si16 h, ui32 flags)
 {
 	CDisplayFolder *newfolder = new CDisplayFolder;
-	char c;
+	wchar_t c;
 
 	if (source != NULL && index != (ui32)-1) {
 		newfolder->name = source->names[index];
@@ -849,7 +886,7 @@ CDisplayFolder *CFolderView::AddDisplayFolder(CFolder *source, ui32 index,
 	}
 	else newfolder->name = NULL, c = 0;
 
-	if (c == '*' || c == '<' || c == '>' || c == '?' || c == '|')
+	if (c == L'*' || c == L'<' || c == L'>' || c == L'?' || c == L'|')
 		newfolder->depth = -1, flags |= 2;
 	else newfolder->depth = depth;
 
@@ -930,7 +967,7 @@ void CFolderView::SizeFolders(int x, int y, int w, int h, CFolder *folder, int *
 
 	for (largest = 0; largest < numindices; largest++) {
 		bignum = (si64)folder->sizes[index[largest]];
-		if (folder->names[index[largest]][0] == '<' && !showfreespace)
+		if (folder->names[index[largest]][0] == L'<' && !showfreespace)
 			bignum = 0;
 		if (bignum != 0) {
 			if (list1sum <= list2sum) {

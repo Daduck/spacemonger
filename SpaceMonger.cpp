@@ -9,6 +9,7 @@
 #include "SetupDlg.h"
 #include "TipWnd.h"
 #include "AboutDialog.h"
+#include "PathUtil.h"
 
 /////////////////////////////////////////////////////////////////////////////
 // The primary CSpaceMonger object
@@ -147,13 +148,10 @@ void CSpaceMonger::OnFileRun(void)
 
 	if (fv == NULL || ft == NULL || fv->selected == NULL) return;
 
-	CString title, path;
-	if (ft != NULL) title += ft->m_path;
-	fv->BuildTitleReverse(fv->selected->source, title);
-	path = title;
-	title += fv->selected->source->names[fv->selected->index];
+	std::wstring title = fv->BuildItemPathW(fv->selected);
+	std::wstring path = fv->BuildContainerPathW(fv->selected);
 
-	ShellExecute(NULL, NULL, title, NULL, path, SW_SHOWDEFAULT);
+	ShellExecuteW(NULL, NULL, title.c_str(), NULL, path.c_str(), SW_SHOWDEFAULT);
 }
 
 void CSpaceMonger::OnFileDelete(void)
@@ -163,37 +161,32 @@ void CSpaceMonger::OnFileDelete(void)
 
 	if (fv == NULL || ft == NULL || fv->selected == NULL) return;
 
-	CString title;
-	if (ft != NULL) title += ft->m_path;
-	fv->BuildTitleReverse(fv->selected->source, title);
-	title += fv->selected->source->names[fv->selected->index];
+	std::wstring title = fv->BuildItemPathW(fv->selected);
 	BOOL isfolder;
 	if (fv->selected->source->children[fv->selected->index] != NULL)
 		isfolder = 1;
 	else isfolder = 0;
 
-	int len = title.GetLength();
-	char *source = new char[len + 2];
-	strcpy_s(source, len + 2, title);
-	source[len] = '\0';
-	source[len + 1] = '\0';
+	std::wstring source = title;
+	source.push_back(L'\0');
+	source.push_back(L'\0');
+	std::wstring deleting = PathUtil::AnsiToWide(CurLang->deleting);
 
-	SHFILEOPSTRUCT fop;
+	SHFILEOPSTRUCTW fop;
+	ZeroMemory(&fop, sizeof(fop));
 	fop.hwnd = m_mainframe->m_hWnd;
 	fop.wFunc = FO_DELETE;
-	fop.pFrom = source;
+	fop.pFrom = source.c_str();
 	fop.pTo = NULL;
 	fop.fFlags = FOF_SIMPLEPROGRESS|FOF_ALLOWUNDO|FOF_NOCONFIRMATION;
 	fop.fAnyOperationsAborted = 0;
 	fop.hNameMappings = NULL;
-	fop.lpszProgressTitle = CurLang->deleting;
+	fop.lpszProgressTitle = deleting.c_str();
 
-	if (SHFileOperation(&fop) != 0 || fop.fAnyOperationsAborted) {
+	if (SHFileOperationW(&fop) != 0 || fop.fAnyOperationsAborted) {
 		AfxMessageBox("Windows failed to delete file.");
-		delete[] source;
 		return;
 	}
-	delete[] source;
 
 	if (isfolder) {
 		delete fv->selected->source->children[fv->selected->index];
@@ -262,19 +255,17 @@ void CSpaceMonger::OnFileProperties(void)
 
 	if (fv == NULL || ft == NULL || fv->selected == NULL) return;
 
-	CString path = ft->m_path;
-	fv->BuildTitleReverse(fv->selected->source, path);
-	path += fv->selected->source->names[fv->selected->index];
+	std::wstring path = fv->BuildItemPathW(fv->selected);
 
-	SHELLEXECUTEINFO si;
+	SHELLEXECUTEINFOW si;
 	ZeroMemory(&si, sizeof(si));
 	si.cbSize = sizeof(si);
 	si.hwnd = fv->GetSafeHwnd();
 	si.nShow = SW_SHOW;
 	si.fMask  = SEE_MASK_INVOKEIDLIST;
-	si.lpVerb = _T("properties");
-	si.lpFile = (LPCTSTR)path;
-	ShellExecuteEx(&si);
+	si.lpVerb = L"properties";
+	si.lpFile = path.c_str();
+	ShellExecuteExW(&si);
 }
 
 void CSpaceMonger::OnAbout()

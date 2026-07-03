@@ -5,6 +5,8 @@
 #include "DiskUsage.h"
 #include "PathUtil.h"
 #include "Lang.h"
+#include <vector>
+#include <algorithm>
 
 #include <io.h>
 #include <sys/types.h>
@@ -54,6 +56,7 @@ BOOL CFolderTree::LoadTree(const CString &path, BOOL includespace, CWnd *modalwi
 	m_path = path;
 	GetSpace(path);
 	if (root != NULL) delete root;
+	nameArena.Reset();
 	root = new CFolder;
 	cur = root;
 	filespace = 0;
@@ -61,6 +64,7 @@ BOOL CFolderTree::LoadTree(const CString &path, BOOL includespace, CWnd *modalwi
 	if (!root->LoadFolderInitial(this, path, clustersize, &dialog)) {
 		root->Finalize();
 		if (root != NULL) delete root;
+		nameArena.Reset();
 		root = cur = NULL;
 		freespace = usedspace = totalspace = 0;
 		m_path = "";
@@ -71,7 +75,7 @@ BOOL CFolderTree::LoadTree(const CString &path, BOOL includespace, CWnd *modalwi
 		numfiles = dialog.numfiles;
 		numfolders = dialog.numfolders;
 		if (includespace)
-			root->AddFile(this, "<<<<<<<<<<<<<<<<<<<<", 1, freespace, freespace, 0);
+			root->AddFile(this, L"<<<<<<<<<<<<<<<<<<<<", 1, freespace, freespace, 0);
 		root->Finalize();
 		::PseudoSleep(1000);
 		modalwin->SetWindowPos(&CWnd::wndTop, 0, 0, 0, 0, SWP_NOMOVE|SWP_NOSIZE);
@@ -149,24 +153,24 @@ CFolder *CFolderTree::Up(void)
 
 //////////////////////////////////////////////////////////////////////////////
 
-static char *cpp_strdup(const char *string, int stringlen)
+static wchar_t *arena_wcsdup(CStringArena& arena, const wchar_t *string, int stringlen)
 {
-	char *newstr = (char *)malloc(stringlen+1 * sizeof(char));
+	wchar_t *newstr = arena.Allocate(stringlen+1);
 	if (newstr == NULL) return(NULL);
 
-	char *src;
-	char c;
+	wchar_t *src;
+	wchar_t c;
 	BOOL allupper = 1;
 	src = newstr;
 	while (stringlen--) {
 		c = *src++ = *string++;
-		if (c >= 'a' && c <= 'z') allupper = 0;
+		if (c >= L'a' && c <= L'z') allupper = 0;
 	}
-	*src = '\0';
+	*src = L'\0';
 	if (allupper && src != newstr) {
 		src = newstr+1;
-		while ((c = *src) != '\0') {
-			if (c >= 'A' && c <= 'Z') *src += 32;
+		while ((c = *src) != L'\0') {
+			if (c >= L'A' && c <= L'Z') *src += 32;
 			src++;
 		}
 	}
@@ -178,7 +182,7 @@ CFolder::CFolder()
 {
 	cur = 0;
 	max = 32;
-	names = (char **)malloc(sizeof(char *) * max);
+	names = (wchar_t **)malloc(sizeof(wchar_t *) * max);
 	sizes = (ui64 *)malloc(sizeof(ui64) * max);
 	actualsizes = (ui64 *)malloc(sizeof(ui64) * max);
 	children = (CFolder **)malloc(sizeof(CFolder *) * max);
@@ -193,7 +197,6 @@ CFolder::~CFolder()
 	unsigned int i;
 
 	for (i = 0; i < cur; i++) {
-		if (names[i] != NULL) free(names[i]);
 		if (children[i] != NULL) delete children[i];
 	}
 
@@ -212,13 +215,13 @@ CFolder::~CFolder()
 void CFolder::MoreEntries(void)
 {
 	int newmax = max * 2;
-	char **newnames = (char **)malloc(sizeof(char *) * newmax);
+	wchar_t **newnames = (wchar_t **)malloc(sizeof(wchar_t *) * newmax);
 	ui64 *newsizes = (ui64 *)malloc(sizeof(ui64) * newmax);
 	ui64 *newactualsizes = (ui64 *)malloc(sizeof(ui64) * newmax);
 	ui64 *newtimes = (ui64 *)malloc(sizeof(ui64) * newmax);
 	CFolder **newkids = (CFolder **)malloc(sizeof(CFolder *) * newmax);
 
-	memcpy(newnames, names, max * sizeof(char *));
+	memcpy(newnames, names, max * sizeof(wchar_t *));
 	memcpy(newsizes, sizes, max * sizeof(ui64));
 	memcpy(newtimes, times, max * sizeof(ui64));
 	memcpy(newactualsizes, actualsizes, max * sizeof(ui64));
@@ -237,12 +240,11 @@ void CFolder::MoreEntries(void)
 	max = newmax;
 }
 
-void CFolder::AddFile(CFolderTree *tree, const char *name, ui32 namelen, ui64 size,
-	ui64 actual_size, ui64 time)
+void CFolder::AddFile(CFolderTree *tree, const wchar_t *name, ui32 namelen, ui64 size, ui64 actual_size, ui64 time)
 {
 	if (cur >= max) MoreEntries();
 
-	names[cur] = cpp_strdup(name, namelen);
+	names[cur] = arena_wcsdup(tree->nameArena, name, namelen);
 	actualsizes[cur] = actual_size;
 	times[cur] = time;
 	size_self += (sizes[cur] = size);
@@ -251,12 +253,11 @@ void CFolder::AddFile(CFolderTree *tree, const char *name, ui32 namelen, ui64 si
 	tree->filespace += size;
 }
 
-void CFolder::AddFolder(CFolderTree *tree, const char *name, ui32 namelen, CFolder *folder,
-	ui64 time)
+void CFolder::AddFolder(CFolderTree *tree, const wchar_t *name, ui32 namelen, CFolder *folder, ui64 time)
 {
 	if (cur >= max) MoreEntries();
 
-	names[cur] = cpp_strdup(name, namelen);
+	names[cur] = arena_wcsdup(tree->nameArena, name, namelen);
 	size_children += (sizes[cur] = folder->SizeTotal());
 	actualsizes[cur] = sizes[cur];
 	times[cur] = time;
@@ -270,8 +271,8 @@ void CFolder::AddFolder(CFolderTree *tree, const char *name, ui32 namelen, CFold
 //   Performs an 8-bit counting sort on the given data.  O(n).
 
 void CFolder::EightBitCountingSort(ui64 *dsize, ui64 *ssize, ui32 count, ui32 bitpos,
-	char **dnames, char **snames, CFolder **dkids, CFolder **skids,
-	ui64 *dasize, ui64 *sasize, ui64 *dtimes, ui64 *stimes)
+		wchar_t **dnames, wchar_t **snames, CFolder **dkids, CFolder **skids,
+		ui64 *dasize, ui64 *sasize, ui64 *dtimes, ui64 *stimes)
 {
 	ui32 countarray[257];
 	ui32 i, dest;
@@ -298,7 +299,6 @@ void CFolder::EightBitCountingSort(ui64 *dsize, ui64 *ssize, ui32 count, ui32 bi
 		dkids[dest] = skids[i];
 		dasize[dest] = sasize[i];
 		dtimes[dest] = stimes[i];
-		if (dkids[dest] != NULL) dkids[dest]->parentindex = i;
 	}
 }
 
@@ -309,28 +309,69 @@ void CFolder::Finalize(void)
 {
 	if (cur <= 1) return;
 
-	char **newnames = (char **)malloc(sizeof(char *) * cur);
-	ui64 *newsizes = (ui64 *)malloc(sizeof(ui64) * cur);
-	ui64 *newactualsizes = (ui64 *)malloc(sizeof(ui64) * cur);
-	CFolder **newkids = (CFolder **)malloc(sizeof(CFolder *) * cur);
-	ui64 *newtimes = (ui64 *)malloc(sizeof(ui64) * cur);
+	if (cur < 512) {
+		std::vector<ui32> indices(cur);
+		for (ui32 i = 0; i < cur; i++) indices[i] = i;
+		std::sort(indices.begin(), indices.end(), [&](ui32 a, ui32 b) {
+			return sizes[a] > sizes[b];
+		});
 
-	// We do a radix sort with internal counting sort.  This means
-	// that we pass over the source data exactly 16*cur times to sort it.
-	EightBitCountingSort(newsizes, sizes, cur, 0,  newnames, names, newkids, children, newactualsizes, actualsizes, newtimes, times);
-	EightBitCountingSort(sizes, newsizes, cur, 8,  names, newnames, children, newkids, actualsizes, newactualsizes, times, newtimes);
-	EightBitCountingSort(newsizes, sizes, cur, 16, newnames, names, newkids, children, newactualsizes, actualsizes, newtimes, times);
-	EightBitCountingSort(sizes, newsizes, cur, 24, names, newnames, children, newkids, actualsizes, newactualsizes, times, newtimes);
-	EightBitCountingSort(newsizes, sizes, cur, 32, newnames, names, newkids, children, newactualsizes, actualsizes, newtimes, times);
-	EightBitCountingSort(sizes, newsizes, cur, 40, names, newnames, children, newkids, actualsizes, newactualsizes, times, newtimes);
-	EightBitCountingSort(newsizes, sizes, cur, 48, newnames, names, newkids, children, newactualsizes, actualsizes, newtimes, times);
-	EightBitCountingSort(sizes, newsizes, cur, 56, names, newnames, children, newkids, actualsizes, newactualsizes, times, newtimes);
+		for (ui32 i = 0; i < cur; i++) {
+			if (indices[i] != i) {
+				ui32 j = i;
+				wchar_t* t_name = names[j];
+				ui64 t_size = sizes[j];
+				ui64 t_asize = actualsizes[j];
+				CFolder* t_kid = children[j];
+				ui64 t_time = times[j];
 
-	free(newtimes);
-	free(newnames);
-	free(newsizes);
-	free(newactualsizes);
-	free(newkids);
+				while (indices[j] != i) {
+					ui32 k = indices[j];
+					names[j] = names[k];
+					sizes[j] = sizes[k];
+					actualsizes[j] = actualsizes[k];
+					children[j] = children[k];
+					times[j] = times[k];
+
+					indices[j] = j;
+					j = k;
+				}
+				names[j] = t_name;
+				sizes[j] = t_size;
+				actualsizes[j] = t_asize;
+				children[j] = t_kid;
+				times[j] = t_time;
+				indices[j] = j;
+			}
+		}
+	} else {
+		wchar_t **newnames = (wchar_t **)malloc(sizeof(wchar_t *) * cur);
+		ui64 *newsizes = (ui64 *)malloc(sizeof(ui64) * cur);
+		ui64 *newactualsizes = (ui64 *)malloc(sizeof(ui64) * cur);
+		CFolder **newkids = (CFolder **)malloc(sizeof(CFolder *) * cur);
+		ui64 *newtimes = (ui64 *)malloc(sizeof(ui64) * cur);
+
+		// We do a radix sort with internal counting sort.  This means
+		// that we pass over the source data exactly 16*cur times to sort it.
+		EightBitCountingSort(newsizes, sizes, cur, 0,  newnames, names, newkids, children, newactualsizes, actualsizes, newtimes, times);
+		EightBitCountingSort(sizes, newsizes, cur, 8,  names, newnames, children, newkids, actualsizes, newactualsizes, times, newtimes);
+		EightBitCountingSort(newsizes, sizes, cur, 16, newnames, names, newkids, children, newactualsizes, actualsizes, newtimes, times);
+		EightBitCountingSort(sizes, newsizes, cur, 24, names, newnames, children, newkids, actualsizes, newactualsizes, times, newtimes);
+		EightBitCountingSort(newsizes, sizes, cur, 32, newnames, names, newkids, children, newactualsizes, actualsizes, newtimes, times);
+		EightBitCountingSort(sizes, newsizes, cur, 40, names, newnames, children, newkids, actualsizes, newactualsizes, times, newtimes);
+		EightBitCountingSort(newsizes, sizes, cur, 48, newnames, names, newkids, children, newactualsizes, actualsizes, newtimes, times);
+		EightBitCountingSort(sizes, newsizes, cur, 56, names, newnames, children, newkids, actualsizes, newactualsizes, times, newtimes);
+
+		free(newtimes);
+		free(newnames);
+		free(newsizes);
+		free(newactualsizes);
+		free(newkids);
+	}
+
+	for (ui32 i = 0; i < cur; i++) {
+		if (children[i] != NULL) children[i]->parentindex = i;
+	}
 }
 
 static ui32 strxcpy(char *dest, const char *src)
@@ -420,8 +461,7 @@ BOOL CFolder::LoadFolder(CFolderTree *tree, std::wstring& path, ui64 clustersize
 			CFolder *newfolder = new CFolder;
 			newfolder->LoadFolder(tree, path, clustersize, aligned, dialog);
 
-			std::string ansiName = PathUtil::WideToAnsi(finddata.cFileName);
-			AddFolder(tree, ansiName.c_str(), (ui32)ansiName.size(), newfolder,
+			AddFolder(tree, finddata.cFileName, wcslen(finddata.cFileName), newfolder,
 				*(ui64 *)&finddata.ftLastWriteTime);
 			path.resize(childLength);
 		}
@@ -437,8 +477,7 @@ BOOL CFolder::LoadFolder(CFolderTree *tree, std::wstring& path, ui64 clustersize
 			ui64 actualsize = (ui64)SM_GetLogicalFileSize(&sizeinfo);
 			size = (ui64)SM_ChooseDisplayedFileSize(&sizeinfo, clustersize, aligned);
 			
-			std::string ansiName = PathUtil::WideToAnsi(finddata.cFileName);
-			AddFile(tree, ansiName.c_str(), (ui32)ansiName.size(), size, actualsize,
+			AddFile(tree, finddata.cFileName, wcslen(finddata.cFileName), size, actualsize,
 				*(ui64 *)&finddata.ftLastWriteTime);
 			path.resize(fileLength);
 		}
@@ -453,7 +492,9 @@ BOOL CFolder::LoadFolder(CFolderTree *tree, std::wstring& path, ui64 clustersize
 			MSG msg;
 			if (dialog != NULL) {
 				std::string ansiPath = PathUtil::WideToAnsi(path);
-				dialog->SetPath(tree, ansiPath.c_str(), this);
+				const char *displayPath = ansiPath.c_str();
+				if (strncmp(displayPath, "\\\\?\\", 4) == 0) displayPath += 4;
+				dialog->SetPath(tree, displayPath, this);
 			}
 			while (::PeekMessage(&msg, 0, 0, 0, PM_REMOVE)) {
 				::TranslateMessage(&msg);

@@ -41,6 +41,9 @@ std::wstring PrepareLongPath(const std::string& path);
 // Appends one path component and returns the path length before appending.
 std::wstring::size_type AppendComponent(std::wstring& path, const wchar_t *component);
 
+// Builds a wide path from the app's MBCS root plus wide scanner path parts.
+std::wstring BuildWidePath(const char *root, const std::wstring& relativePath, const wchar_t *leafName);
+
 } // namespace PathUtil
 
 #endif // PATHUTIL_H

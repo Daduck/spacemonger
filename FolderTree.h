@@ -11,6 +11,8 @@
 #include <string>
 #endif
 
+#include "StringArena.h"
+
 class CFolderTree;
 class CFolderDialog;
 struct CFolder;
@@ -20,8 +22,8 @@ public:
 	CFolder();
 	~CFolder();
 
-	void AddFile(CFolderTree *tree, const char *name, ui32 namelen, ui64 size, ui64 actual_size, ui64 time);
-	void AddFolder(CFolderTree *tree, const char *name, ui32 namelen, CFolder *folder, ui64 time);
+	void AddFile(CFolderTree *tree, const wchar_t *name, ui32 namelen, ui64 size, ui64 actual_size, ui64 time);
+	void AddFolder(CFolderTree *tree, const wchar_t *name, ui32 namelen, CFolder *folder, ui64 time);
 	void Finalize(void);
 	void DelFile(unsigned int index);
 	void RenameFile(unsigned int index, const CString &name);
@@ -34,7 +36,7 @@ public:
 private:
 	void MoreEntries(void);
 	void EightBitCountingSort(ui64 *dsize, ui64 *ssize, ui32 count, ui32 bitpos,
-		char **dnames, char **snames, CFolder **dkids, CFolder **skids,
+		wchar_t **dnames, wchar_t **snames, CFolder **dkids, CFolder **skids,
 		ui64 *dasize, ui64 *sasize, ui64 *dtimes, ui64 *stimes);
 	BOOL LoadFolder(CFolderTree *tree, std::wstring& path, ui64 clustersize, BOOL aligned, CFolderDialog *dialog);
 
@@ -43,7 +45,7 @@ public:
 	CFolder *parent;
 	unsigned int parentindex;
 
-	char **names;
+	wchar_t **names;
 	CFolder **children;
 	ui64 *sizes;
 	ui64 *actualsizes;
@@ -71,6 +73,7 @@ protected:
 	CFolder *root, *cur;
 
 public:
+	CStringArena nameArena;
 	CString m_path;
 	ui64 freespace, usedspace, totalspace, clustersize;
 	ui64 numfiles, numfolders;
