@@ -146,7 +146,7 @@ int CFolderView::OnCreate(LPCREATESTRUCT lpCreateStruct)
 		logpalette->palPalEntry[i].peBlue = GetBValue(BoxColors[i]);
 	}
 	m_palette.CreatePalette(logpalette);
-	delete logpalette;
+	free(logpalette);
 
 	black.CreateSolidBrush(RGB(0x00, 0x00, 0x00));
 	white.CreateSolidBrush(RGB(0xFF, 0xFF, 0xFF));
@@ -941,7 +941,7 @@ void CFolderView::BuildFolderLayout(int x, int y, int w, int h, CFolder *folder,
 
 	SizeFolders(x, y, w, h, folder, indices, (int)folder->cur, depth);
 
-	delete indices;
+	delete[] indices;
 }
 
 void CFolderView::SizeFolders(int x, int y, int w, int h, CFolder *folder, int *index, int numindices, int depth)
@@ -983,8 +983,8 @@ void CFolderView::SizeFolders(int x, int y, int w, int h, CFolder *folder, int *
 
 	// Don't bother if the files have no space
 	if (list1sum + list2sum <= 0) {
-		delete list1;
-		delete list2;
+		delete[] list1;
+		delete[] list2;
 		return;
 	}
 
@@ -1045,8 +1045,8 @@ void CFolderView::SizeFolders(int x, int y, int w, int h, CFolder *folder, int *
 		else AddDisplayFolder(folder, (ui32)-1, depth, x2, y2, w2, h2, 0);
 	}
 
-	delete list1;
-	delete list2;
+	delete[] list1;
+	delete[] list2;
 }
 
 void CFolderView::ZoomIn(CDisplayFolder *folder)

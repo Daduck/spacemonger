@@ -116,7 +116,7 @@ void CDriveInfo::LoadDriveInfo(char let)
 
 	if (type != 0 && type != 1) {
 		SHFILEINFO fileinfo;
-		memset(&fileinfo, sizeof(SHFILEINFO), 0);
+		memset(&fileinfo, 0, sizeof(SHFILEINFO));
 
 		SHGetFileInfo(name, 0, &fileinfo, sizeof(SHFILEINFO),
 			SHGFI_DISPLAYNAME|SHGFI_ICON);

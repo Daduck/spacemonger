@@ -79,6 +79,14 @@ int test_prepare_long_path() {
 	return 1;
 }
 
+int test_remove_long_path_prefix() {
+	CHECK(PathUtil::RemoveLongPathPrefix(L"\\\\?\\C:\\foo\\bar") == L"C:\\foo\\bar");
+	CHECK(PathUtil::RemoveLongPathPrefix(L"\\\\?\\UNC\\server\\share\\file") == L"\\\\server\\share\\file");
+	CHECK(PathUtil::RemoveLongPathPrefix(L"C:\\foo\\bar") == L"C:\\foo\\bar");
+	CHECK(PathUtil::RemoveLongPathPrefix(L"\\\\.\\PhysicalDrive0") == L"\\\\.\\PhysicalDrive0");
+	return 1;
+}
+
 int test_append_component_returns_original_length() {
 	std::wstring path = L"\\\\?\\C:\\root\\";
 	size_t original = PathUtil::AppendComponent(path, L"child");
@@ -121,6 +129,7 @@ int main() {
 	if (!test_ensure_trailing_backslash()) return 1;
 	if (!test_get_absolute_path()) return 1;
 	if (!test_prepare_long_path()) return 1;
+	if (!test_remove_long_path_prefix()) return 1;
 	if (!test_append_component_returns_original_length()) return 1;
 	if (!test_append_component_adds_separator_when_needed()) return 1;
 	if (!test_build_wide_path_preserves_non_ascii_name()) return 1;

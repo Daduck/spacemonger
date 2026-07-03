@@ -28,6 +28,7 @@ set(SPACEMONGER_SOURCES
   AboutDialog.cpp
   DriveDialog.cpp
   DiskUsage.cpp
+  FolderEntryArrays.cpp
   FolderTree.cpp
   FolderView.cpp
   Freedoc.cpp
@@ -92,3 +93,16 @@ set_target_properties(StringArena_test PROPERTIES
   MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
 )
 add_test(NAME StringArena_test COMMAND StringArena_test)
+
+add_executable(FolderEntryArrays_test
+  tests/FolderEntryArrays_test.cpp
+  FolderEntryArrays.cpp
+  FolderEntryArrays.h
+)
+target_include_directories(FolderEntryArrays_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(FolderEntryArrays_test PRIVATE WIN32 _WINDOWS _MBCS)
+target_compile_options(FolderEntryArrays_test PRIVATE /W3 /EHsc)
+set_target_properties(FolderEntryArrays_test PROPERTIES
+  MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+)
+add_test(NAME FolderEntryArrays_test COMMAND FolderEntryArrays_test)

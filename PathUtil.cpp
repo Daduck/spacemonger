@@ -140,6 +140,16 @@ std::wstring PrepareLongPath(const std::string& path) {
 	return PrepareLongPath(AnsiToWide(path));
 }
 
+std::wstring RemoveLongPathPrefix(const std::wstring& path) {
+	if (path.rfind(L"\\\\?\\UNC\\", 0) == 0) {
+		return L"\\\\" + path.substr(8);
+	}
+	if (path.rfind(L"\\\\?\\", 0) == 0) {
+		return path.substr(4);
+	}
+	return path;
+}
+
 std::wstring::size_type AppendComponent(std::wstring& path, const wchar_t *component) {
 	std::wstring::size_type originalLength = path.size();
 	if (component == NULL || component[0] == L'\0') {

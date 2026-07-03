@@ -11,7 +11,7 @@
 		} \
 	} while (0)
 
-static int local_files_keep_cluster_rounded_size()
+static int local_files_round_up_to_cluster_size()
 {
 	SM_FILE_SIZE_INFO info;
 	info.logical_size = 4097;
@@ -19,6 +19,24 @@ static int local_files_keep_cluster_rounded_size()
 	info.attributes = FILE_ATTRIBUTE_ARCHIVE;
 	info.has_allocated_size = 0;
 
+	CHECK(SM_ChooseDisplayedFileSize(&info, 4095, 1) == 8192);
+	CHECK(SM_ChooseDisplayedFileSize(&info, 4095, 0) == 8192);
+	return 1;
+}
+
+static int local_files_keep_zero_and_exact_cluster_sizes()
+{
+	SM_FILE_SIZE_INFO info;
+	info.logical_size = 0;
+	info.allocated_size = 0;
+	info.attributes = FILE_ATTRIBUTE_ARCHIVE;
+	info.has_allocated_size = 0;
+
+	CHECK(SM_ChooseDisplayedFileSize(&info, 4095, 1) == 0);
+	CHECK(SM_ChooseDisplayedFileSize(&info, 4095, 0) == 0);
+
+	info.logical_size = 4096;
+	CHECK(SM_ChooseDisplayedFileSize(&info, 4095, 1) == 4096);
 	CHECK(SM_ChooseDisplayedFileSize(&info, 4095, 0) == 4096);
 	return 1;
 }
@@ -82,7 +100,8 @@ static int logical_size_is_preserved_for_details()
 
 int main()
 {
-	if (!local_files_keep_cluster_rounded_size()) return 1;
+	if (!local_files_round_up_to_cluster_size()) return 1;
+	if (!local_files_keep_zero_and_exact_cluster_sizes()) return 1;
 	if (!ordinary_files_do_not_need_allocated_size_lookup()) return 1;
 	if (!sparse_files_need_allocated_size_lookup()) return 1;
 	if (!cloud_placeholders_do_not_need_allocated_size_lookup()) return 1;

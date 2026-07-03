@@ -134,6 +134,7 @@ static LRESULT CALLBACK TipWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 
 	case WM_CREATE:
 		info = (TipWndInfo *)malloc(sizeof(TipWndInfo));
+		if (!info) return -1;
 		info->icon = NULL;
 		info->text = NULL;
 		info->textlen = 0;
@@ -295,7 +296,11 @@ static LRESULT CALLBACK TipWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 		}
 		info->textlen = strlen((const char *)lParam);
 		info->text = (char *)malloc(info->textlen+1);
-		strcpy_s(info->text, info->textlen+1, (const char *)lParam);
+		if (info->text) {
+			strcpy_s(info->text, info->textlen+1, (const char *)lParam);
+		} else {
+			info->textlen = 0;
+		}
 		::RedrawWindow(hwnd, NULL, NULL, RDW_ERASE|RDW_INTERNALPAINT);
 		return 0;
 

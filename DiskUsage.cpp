@@ -46,14 +46,17 @@ int SM_ShouldLoadAllocatedSize(DWORD attributes)
 
 static SM_UINT64 SM_LegacyClusterSize(SM_UINT64 logical_size, SM_UINT64 cluster_mask, int aligned)
 {
-	if (aligned)
-		return (logical_size + cluster_mask) & cluster_mask;
-
 	SM_UINT64 cluster_size = cluster_mask + 1;
-	if (cluster_size == 0)
+	if (logical_size == 0 || cluster_size == 0)
 		return logical_size;
 
-	return logical_size - (logical_size % cluster_size);
+	if (logical_size > ((SM_UINT64)-1) - cluster_mask)
+		return logical_size;
+
+	if (aligned)
+		return (logical_size + cluster_mask) & ~cluster_mask;
+
+	return ((logical_size + cluster_mask) / cluster_size) * cluster_size;
 }
 
 SM_UINT64 SM_ChooseDisplayedFileSize(const SM_FILE_SIZE_INFO *info, SM_UINT64 cluster_mask, int aligned)

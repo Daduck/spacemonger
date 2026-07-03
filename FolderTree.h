@@ -22,8 +22,8 @@ public:
 	CFolder();
 	~CFolder();
 
-	void AddFile(CFolderTree *tree, const wchar_t *name, ui32 namelen, ui64 size, ui64 actual_size, ui64 time);
-	void AddFolder(CFolderTree *tree, const wchar_t *name, ui32 namelen, CFolder *folder, ui64 time);
+	BOOL AddFile(CFolderTree *tree, const wchar_t *name, ui32 namelen, ui64 size, ui64 actual_size, ui64 time);
+	BOOL AddFolder(CFolderTree *tree, const wchar_t *name, ui32 namelen, CFolder *folder, ui64 time);
 	void Finalize(void);
 	void DelFile(unsigned int index);
 	void RenameFile(unsigned int index, const CString &name);
@@ -34,7 +34,7 @@ public:
 	inline ui64 SizeTotal() { return(size_self + size_children); }
 
 private:
-	void MoreEntries(void);
+	BOOL MoreEntries(void);
 	void EightBitCountingSort(ui64 *dsize, ui64 *ssize, ui32 count, ui32 bitpos,
 		wchar_t **dnames, wchar_t **snames, CFolder **dkids, CFolder **skids,
 		ui64 *dasize, ui64 *sasize, ui64 *dtimes, ui64 *stimes);
