@@ -12,7 +12,7 @@ SM_UINT64 SM_GetLogicalFileSize(const SM_FILE_SIZE_INFO *info)
 	return info->logical_size;
 }
 
-static int SM_UsesAllocatedSize(DWORD attributes)
+int SM_ShouldLoadAllocatedSize(DWORD attributes)
 {
 	DWORD flags =
 		FILE_ATTRIBUTE_COMPRESSED |
@@ -40,17 +40,48 @@ static SM_UINT64 SM_LegacyClusterSize(SM_UINT64 logical_size, SM_UINT64 cluster_
 
 SM_UINT64 SM_ChooseDisplayedFileSize(const SM_FILE_SIZE_INFO *info, SM_UINT64 cluster_mask, int aligned)
 {
-	if (info->has_allocated_size && SM_UsesAllocatedSize(info->attributes))
+	if (info->has_allocated_size && SM_ShouldLoadAllocatedSize(info->attributes))
 		return info->allocated_size;
 
 	return SM_LegacyClusterSize(info->logical_size, cluster_mask, aligned);
+}
+
+static SM_GetCompressedFileSizeFunc SM_GetCompressedFileSizeProc(void)
+{
+	static int initialized = 0;
+	static SM_GetCompressedFileSizeFunc get_compressed_size = NULL;
+
+	if (!initialized) {
+		HMODULE kernel = GetModuleHandle("KERNEL32.DLL");
+		if (kernel != NULL)
+			get_compressed_size = (SM_GetCompressedFileSizeFunc)GetProcAddress(kernel, "GetCompressedFileSizeA");
+		initialized = 1;
+	}
+
+	return get_compressed_size;
+}
+
+typedef DWORD (WINAPI *SM_GetCompressedFileSizeWFunc)(LPCWSTR filename, LPDWORD high_size);
+
+static SM_GetCompressedFileSizeWFunc SM_GetCompressedFileSizeWProc(void)
+{
+	static int initialized = 0;
+	static SM_GetCompressedFileSizeWFunc get_compressed_size = NULL;
+
+	if (!initialized) {
+		HMODULE kernel = GetModuleHandle("KERNEL32.DLL");
+		if (kernel != NULL)
+			get_compressed_size = (SM_GetCompressedFileSizeWFunc)GetProcAddress(kernel, "GetCompressedFileSizeW");
+		initialized = 1;
+	}
+
+	return get_compressed_size;
 }
 
 int SM_LoadFileSizeInfo(const char *path, const WIN32_FIND_DATA *finddata, SM_FILE_SIZE_INFO *info)
 {
 	DWORD high_size = 0;
 	DWORD low_size;
-	HMODULE kernel;
 	SM_GetCompressedFileSizeFunc get_compressed_size;
 
 	if (path == NULL || finddata == NULL || info == NULL)
@@ -61,11 +92,10 @@ int SM_LoadFileSizeInfo(const char *path, const WIN32_FIND_DATA *finddata, SM_FI
 	info->attributes = finddata->dwFileAttributes;
 	info->has_allocated_size = 0;
 
-	kernel = GetModuleHandle("KERNEL32.DLL");
-	if (kernel == NULL)
+	if (!SM_ShouldLoadAllocatedSize(info->attributes))
 		return 1;
 
-	get_compressed_size = (SM_GetCompressedFileSizeFunc)GetProcAddress(kernel, "GetCompressedFileSizeA");
+	get_compressed_size = SM_GetCompressedFileSizeProc();
 	if (get_compressed_size == NULL)
 		return 1;
 
@@ -79,13 +109,10 @@ int SM_LoadFileSizeInfo(const char *path, const WIN32_FIND_DATA *finddata, SM_FI
 	return 1;
 }
 
-typedef DWORD (WINAPI *SM_GetCompressedFileSizeWFunc)(LPCWSTR filename, LPDWORD high_size);
-
 int SM_LoadFileSizeInfoW(const wchar_t *path, const WIN32_FIND_DATAW *finddata, SM_FILE_SIZE_INFO *info)
 {
 	DWORD high_size = 0;
 	DWORD low_size;
-	HMODULE kernel;
 	SM_GetCompressedFileSizeWFunc get_compressed_size;
 
 	if (path == NULL || finddata == NULL || info == NULL)
@@ -96,11 +123,10 @@ int SM_LoadFileSizeInfoW(const wchar_t *path, const WIN32_FIND_DATAW *finddata, 
 	info->attributes = finddata->dwFileAttributes;
 	info->has_allocated_size = 0;
 
-	kernel = GetModuleHandle("KERNEL32.DLL");
-	if (kernel == NULL)
+	if (!SM_ShouldLoadAllocatedSize(info->attributes))
 		return 1;
 
-	get_compressed_size = (SM_GetCompressedFileSizeWFunc)GetProcAddress(kernel, "GetCompressedFileSizeW");
+	get_compressed_size = SM_GetCompressedFileSizeWProc();
 	if (get_compressed_size == NULL)
 		return 1;
 

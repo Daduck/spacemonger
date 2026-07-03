@@ -14,6 +14,17 @@ static void local_files_keep_cluster_rounded_size()
 	assert(SM_ChooseDisplayedFileSize(&info, 4095, 0) == 4096);
 }
 
+static void ordinary_files_do_not_need_allocated_size_lookup()
+{
+	assert(!SM_ShouldLoadAllocatedSize(FILE_ATTRIBUTE_ARCHIVE));
+}
+
+static void sparse_and_cloud_files_need_allocated_size_lookup()
+{
+	assert(SM_ShouldLoadAllocatedSize(FILE_ATTRIBUTE_SPARSE_FILE));
+	assert(SM_ShouldLoadAllocatedSize(FILE_ATTRIBUTE_UNPINNED));
+}
+
 static void sparse_and_offline_files_use_allocated_size()
 {
 	SM_FILE_SIZE_INFO info;
@@ -50,6 +61,8 @@ static void logical_size_is_preserved_for_details()
 int main()
 {
 	local_files_keep_cluster_rounded_size();
+	ordinary_files_do_not_need_allocated_size_lookup();
+	sparse_and_cloud_files_need_allocated_size_lookup();
 	sparse_and_offline_files_use_allocated_size();
 	unpinned_cloud_files_use_allocated_size();
 	logical_size_is_preserved_for_details();

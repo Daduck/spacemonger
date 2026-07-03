@@ -30,6 +30,7 @@ typedef struct SM_FILE_SIZE_INFO {
 
 SM_UINT64 SM_MakeFileSize(DWORD low, DWORD high);
 SM_UINT64 SM_GetLogicalFileSize(const SM_FILE_SIZE_INFO *info);
+int SM_ShouldLoadAllocatedSize(DWORD attributes);
 SM_UINT64 SM_ChooseDisplayedFileSize(const SM_FILE_SIZE_INFO *info, SM_UINT64 cluster_mask, int aligned);
 int SM_LoadFileSizeInfo(const char *path, const WIN32_FIND_DATA *finddata, SM_FILE_SIZE_INFO *info);
 int SM_LoadFileSizeInfoW(const wchar_t *path, const WIN32_FIND_DATAW *finddata, SM_FILE_SIZE_INFO *info);
