@@ -939,21 +939,24 @@ void CFolderView::BuildFolderLayout(int x, int y, int w, int h, CFolder *folder,
 	hmin = minsizes[theApp.m_settings.density + 3][0];
 	vmin = minsizes[theApp.m_settings.density + 3][1];
 
-	SizeFolders(x, y, w, h, folder, indices, (int)folder->cur, depth);
+	int *scratch = new (std::nothrow) int[folder->cur];
+	if (scratch != NULL) {
+		SizeFolders(x, y, w, h, folder, indices, scratch, (int)folder->cur, depth);
+		delete[] scratch;
+	}
 
 	delete[] indices;
 }
 
-void CFolderView::SizeFolders(int x, int y, int w, int h, CFolder *folder, int *index, int numindices, int depth)
+void CFolderView::SizeFolders(int x, int y, int w, int h, CFolder *folder, int *index, int *scratch, int numindices, int depth)
 {
 	if (folder == NULL) return;
 
 	ui64 totalspace = folder->SizeTotal();
 
-	int *list1 = new int[numindices];
-	int *list2 = new int[numindices];
-	int numlist1, numlist2, largest;
-	si64 list1sum, list2sum, bignum;
+	int numlist1 = 0, numlist2 = 0, largest;
+	int list2_back = numindices;
+	si64 list1sum = 0, list2sum = 0, bignum;
 	int x1, y1, w1, h1;
 	int x2, y2, w2, h2;
 	int split;
@@ -962,30 +965,34 @@ void CFolderView::SizeFolders(int x, int y, int w, int h, CFolder *folder, int *
 	// in descending order.  Overall, this is a greedy algorithm,
 	// so it should produce fairly good results.
 
-	numlist1 = numlist2 = 0;
-	list1sum = list2sum = 0;
-
 	for (largest = 0; largest < numindices; largest++) {
 		bignum = (si64)folder->sizes[index[largest]];
 		if (folder->names[index[largest]][0] == L'<' && !showfreespace)
 			bignum = 0;
 		if (bignum != 0) {
 			if (list1sum <= list2sum) {
-				list1[numlist1++] = index[largest];
+				scratch[numlist1++] = index[largest];
 				list1sum += bignum;
 			}
 			else {
-				list2[numlist2++] = index[largest];
+				scratch[--list2_back] = index[largest];
 				list2sum += bignum;
+				numlist2++;
 			}
 		}
 	}
 
 	// Don't bother if the files have no space
 	if (list1sum + list2sum <= 0) {
-		delete[] list1;
-		delete[] list2;
 		return;
+	}
+
+	// Copy lists back into the index array
+	for (int i = 0; i < numlist1; i++) {
+		index[i] = scratch[i];
+	}
+	for (int i = 0; i < numlist2; i++) {
+		index[numlist1 + i] = scratch[numindices - 1 - i];
 	}
 
 	// Okay, we're now as even as we can safely get.  Now we know how to
@@ -1009,16 +1016,16 @@ void CFolderView::SizeFolders(int x, int y, int w, int h, CFolder *folder, int *
 	// Now if a given rectangle has more than one file and is
 	// large enough to be subdivided again, subdivide again
 	if (numlist1 > 1 && w1 > hmin && h1 > vmin)
-		SizeFolders(x1, y1, w1, h1, folder, list1, numlist1, depth);
+		SizeFolders(x1, y1, w1, h1, folder, index, scratch, numlist1, depth);
 	else if (numlist1 > 0) {
 		if (w1 > hmin && h1 > vmin) {
-			AddDisplayFolder(folder, list1[0],
+			AddDisplayFolder(folder, index[0],
 				depth, x1, y1, w1, h1,
-				(folder->children[list1[0]] != NULL));
-			if (folder->children[list1[0]] != NULL) {
+				(folder->children[index[0]] != NULL));
+			if (folder->children[index[0]] != NULL) {
 				if (w1 > hmin && h1 > vmin) {
 					BuildFolderLayout(x1 + 3, y1 + 12, w1 - 6, h1 - 15,
-						folder->children[list1[0]], depth+1);
+						folder->children[index[0]], depth+1);
 				}
 				else AddDisplayFolder(folder, (ui32)-1, depth + 1,
 					x2 + 3, y2 + 12, w2 - 6, h2 - 15, 0);
@@ -1027,16 +1034,16 @@ void CFolderView::SizeFolders(int x, int y, int w, int h, CFolder *folder, int *
 		else AddDisplayFolder(folder, (ui32)-1, depth, x1, y1, w1, h1, 0);
 	}
 	if (numlist2 > 1 && w2 > hmin && h2 > vmin)
-		SizeFolders(x2, y2, w2, h2, folder, list2, numlist2, depth);
+		SizeFolders(x2, y2, w2, h2, folder, index + numlist1, scratch, numlist2, depth);
 	else if (numlist2 > 0) {
 		if (w2 > hmin && h2 > vmin) {
-			AddDisplayFolder(folder, list2[0],
+			AddDisplayFolder(folder, index[numlist1],
 				depth, x2, y2, w2, h2,
-				(folder->children[list2[0]] != NULL));
-			if (folder->children[list2[0]] != NULL) {
+				(folder->children[index[numlist1]] != NULL));
+			if (folder->children[index[numlist1]] != NULL) {
 				if (w2 > hmin && h2 > vmin) {
 					BuildFolderLayout(x2 + 3, y2 + 12, w2 - 6, h2 - 15,
-						folder->children[list2[0]], depth+1);
+						folder->children[index[numlist1]], depth+1);
 				}
 				else AddDisplayFolder(folder, (ui32)-1, depth + 1,
 					x2 + 3, y2 + 12, w2 - 6, h2 - 15, 0);
@@ -1044,9 +1051,6 @@ void CFolderView::SizeFolders(int x, int y, int w, int h, CFolder *folder, int *
 		}
 		else AddDisplayFolder(folder, (ui32)-1, depth, x2, y2, w2, h2, 0);
 	}
-
-	delete[] list1;
-	delete[] list2;
 }
 
 void CFolderView::ZoomIn(CDisplayFolder *folder)

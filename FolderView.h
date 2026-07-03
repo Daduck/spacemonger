@@ -74,7 +74,7 @@ public:
 
 protected:
 	void BuildFolderLayout(int x, int y, int w, int h, CFolder *folder, int depth);
-	void SizeFolders(int x, int y, int w, int h, CFolder *folder, int *index, int numindices, int depth);
+	void SizeFolders(int x, int y, int w, int h, CFolder *folder, int *index, int *scratch, int numindices, int depth);
 	CDisplayFolder *AddDisplayFolder(CFolder *source, ui32 index,
 		si32 depth, si16 x, si16 y, si16 w, si16 h, ui32 flags);
 	void ClearDisplayFolders(void);
