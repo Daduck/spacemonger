@@ -1,0 +1,495 @@
+﻿diff --git a/DiskUsage.cpp b/DiskUsage.cpp
+index 931dc23..938c75a 100644
+--- a/DiskUsage.cpp
++++ b/DiskUsage.cpp
+@@ -12,13 +12,10 @@ SM_UINT64 SM_GetLogicalFileSize(const SM_FILE_SIZE_INFO *info)
+ 	return info->logical_size;
+ }
+ 
+-int SM_ShouldLoadAllocatedSize(DWORD attributes)
++static int SM_IsCloudPlaceholder(DWORD attributes)
+ {
+ 	DWORD flags =
+-		FILE_ATTRIBUTE_COMPRESSED |
+ 		FILE_ATTRIBUTE_OFFLINE |
+-		FILE_ATTRIBUTE_REPARSE_POINT |
+-		FILE_ATTRIBUTE_SPARSE_FILE |
+ 		FILE_ATTRIBUTE_RECALL_ON_OPEN |
+ 		FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS |
+ 		FILE_ATTRIBUTE_UNPINNED;
+@@ -26,6 +23,16 @@ int SM_ShouldLoadAllocatedSize(DWORD attributes)
+ 	return (attributes & flags) != 0;
+ }
+ 
++int SM_ShouldLoadAllocatedSize(DWORD attributes)
++{
++	DWORD flags =
++		FILE_ATTRIBUTE_COMPRESSED |
++		FILE_ATTRIBUTE_REPARSE_POINT |
++		FILE_ATTRIBUTE_SPARSE_FILE;
++
++	return !SM_IsCloudPlaceholder(attributes) && (attributes & flags) != 0;
++}
++
+ static SM_UINT64 SM_LegacyClusterSize(SM_UINT64 logical_size, SM_UINT64 cluster_mask, int aligned)
+ {
+ 	if (aligned)
+@@ -40,6 +47,9 @@ static SM_UINT64 SM_LegacyClusterSize(SM_UINT64 logical_size, SM_UINT64 cluster_
+ 
+ SM_UINT64 SM_ChooseDisplayedFileSize(const SM_FILE_SIZE_INFO *info, SM_UINT64 cluster_mask, int aligned)
+ {
++	if (SM_IsCloudPlaceholder(info->attributes))
++		return 0;
++
+ 	if (info->has_allocated_size && SM_ShouldLoadAllocatedSize(info->attributes))
+ 		return info->allocated_size;
+ 
+@@ -92,6 +102,12 @@ int SM_LoadFileSizeInfo(const char *path, const WIN32_FIND_DATA *finddata, SM_FI
+ 	info->attributes = finddata->dwFileAttributes;
+ 	info->has_allocated_size = 0;
+ 
++	if (SM_IsCloudPlaceholder(info->attributes)) {
++		info->allocated_size = 0;
++		info->has_allocated_size = 1;
++		return 1;
++	}
++
+ 	if (!SM_ShouldLoadAllocatedSize(info->attributes))
+ 		return 1;
+ 
+@@ -123,6 +139,12 @@ int SM_LoadFileSizeInfoW(const wchar_t *path, const WIN32_FIND_DATAW *finddata,
+ 	info->attributes = finddata->dwFileAttributes;
+ 	info->has_allocated_size = 0;
+ 
++	if (SM_IsCloudPlaceholder(info->attributes)) {
++		info->allocated_size = 0;
++		info->has_allocated_size = 1;
++		return 1;
++	}
++
+ 	if (!SM_ShouldLoadAllocatedSize(info->attributes))
+ 		return 1;
+ 
+diff --git a/FolderTree.cpp b/FolderTree.cpp
+index 0ce455f..8148f86 100644
+--- a/FolderTree.cpp
++++ b/FolderTree.cpp
+@@ -342,10 +342,7 @@ static ui32 strxcpy(char *dest, const char *src)
+ 
+ BOOL CFolder::LoadFolderInitial(CFolderTree *tree, const char *name, ui64 clustersize, CFolderDialog *dialog)
+ {
+-	// Convert input name to Wide path
+ 	std::wstring widePath = PathUtil::AnsiToWide(name);
+-	
+-	// Resolve absolute path
+ 	std::wstring absPath = PathUtil::GetAbsolutePath(widePath);
+ 	absPath = PathUtil::EnsureTrailingBackslash(absPath);
+ 	
+@@ -369,22 +366,25 @@ BOOL CFolder::LoadFolderInitial(CFolderTree *tree, const char *name, ui64 cluste
+ 	while (clusterbits--) clustermod <<= 1;
+ 	aligned = (clustermod == clustersize);
+ 
+-	return LoadFolder(tree, absPath, clustersize-1, aligned, dialog);
++	std::wstring preparedPath = PathUtil::PrepareLongPath(absPath);
++	preparedPath = PathUtil::EnsureTrailingBackslash(preparedPath);
++
++	return LoadFolder(tree, preparedPath, clustersize-1, aligned, dialog);
+ }
+ 
+-BOOL CFolder::LoadFolder(CFolderTree *tree, const std::wstring& path, ui64 clustersize, BOOL aligned, CFolderDialog *dialog)
++BOOL CFolder::LoadFolder(CFolderTree *tree, std::wstring& path, ui64 clustersize, BOOL aligned, CFolderDialog *dialog)
+ {
+ 	WIN32_FIND_DATAW finddata;
+ 	BOOL gotfile;
+ 	HANDLE handle;
+ 	ui64 size;
+ 	static DWORD last_tick = 0;
++	std::wstring::size_type baseLength;
+ 
+-	// Use our new PathUtil to safely construct search path
+-	std::wstring searchPattern = PathUtil::Join(path, L"*.*");
+-	std::wstring preparedSearchPattern = PathUtil::PrepareLongPath(searchPattern);
++	baseLength = PathUtil::AppendComponent(path, L"*.*");
+ 
+-	handle = FindFirstFileW(preparedSearchPattern.c_str(), &finddata);
++	handle = FindFirstFileW(path.c_str(), &finddata);
++	path.resize(baseLength);
+ 	gotfile = (handle != INVALID_HANDLE_VALUE);
+ 	while (gotfile && !dialog->cancelled) {
+ 		// Ignore "." and ".."
+@@ -413,23 +413,26 @@ BOOL CFolder::LoadFolder(CFolderTree *tree, const std::wstring& path, ui64 clust
+ 		if (finddata.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+ 			if (dialog != NULL)
+ 				dialog->IncFolders();
+-			std::wstring nextPath = PathUtil::Join(path, finddata.cFileName);
++			std::wstring::size_type childLength = PathUtil::AppendComponent(path, finddata.cFileName);
++			if (!path.empty() && path.back() != L'\\')
++				path += L'\\';
++
+ 			CFolder *newfolder = new CFolder;
+-			newfolder->LoadFolder(tree, nextPath, clustersize, aligned, dialog);
++			newfolder->LoadFolder(tree, path, clustersize, aligned, dialog);
+ 
+ 			std::string ansiName = PathUtil::WideToAnsi(finddata.cFileName);
+ 			AddFolder(tree, ansiName.c_str(), (ui32)ansiName.size(), newfolder,
+ 				*(ui64 *)&finddata.ftLastWriteTime);
++			path.resize(childLength);
+ 		}
+ 		else {
+ 			// Process files.
+ 			if (dialog != NULL) dialog->IncFiles();
+ 			
+-			std::wstring filePath = PathUtil::Join(path, finddata.cFileName);
+-			std::wstring preparedFilePath = PathUtil::PrepareLongPath(filePath);
++			std::wstring::size_type fileLength = PathUtil::AppendComponent(path, finddata.cFileName);
+ 
+ 			SM_FILE_SIZE_INFO sizeinfo;
+-			SM_LoadFileSizeInfoW(preparedFilePath.c_str(), &finddata, &sizeinfo);
++			SM_LoadFileSizeInfoW(path.c_str(), &finddata, &sizeinfo);
+ 
+ 			ui64 actualsize = (ui64)SM_GetLogicalFileSize(&sizeinfo);
+ 			size = (ui64)SM_ChooseDisplayedFileSize(&sizeinfo, clustersize, aligned);
+@@ -437,6 +440,7 @@ BOOL CFolder::LoadFolder(CFolderTree *tree, const std::wstring& path, ui64 clust
+ 			std::string ansiName = PathUtil::WideToAnsi(finddata.cFileName);
+ 			AddFile(tree, ansiName.c_str(), (ui32)ansiName.size(), size, actualsize,
+ 				*(ui64 *)&finddata.ftLastWriteTime);
++			path.resize(fileLength);
+ 		}
+ 
+ 	nextfile:
+@@ -448,7 +452,7 @@ BOOL CFolder::LoadFolder(CFolderTree *tree, const std::wstring& path, ui64 clust
+ 			last_tick = tick;
+ 			MSG msg;
+ 			if (dialog != NULL) {
+-				std::string ansiPath = PathUtil::WideToAnsi(PathUtil::EnsureTrailingBackslash(path));
++				std::string ansiPath = PathUtil::WideToAnsi(path);
+ 				dialog->SetPath(tree, ansiPath.c_str(), this);
+ 			}
+ 			while (::PeekMessage(&msg, 0, 0, 0, PM_REMOVE)) {
+diff --git a/FolderTree.h b/FolderTree.h
+index 35f5802..7fb6559 100644
+--- a/FolderTree.h
++++ b/FolderTree.h
+@@ -36,7 +36,7 @@ private:
+ 	void EightBitCountingSort(ui64 *dsize, ui64 *ssize, ui32 count, ui32 bitpos,
+ 		char **dnames, char **snames, CFolder **dkids, CFolder **skids,
+ 		ui64 *dasize, ui64 *sasize, ui64 *dtimes, ui64 *stimes);
+-	BOOL LoadFolder(CFolderTree *tree, const std::wstring& path, ui64 clustersize, BOOL aligned, CFolderDialog *dialog);
++	BOOL LoadFolder(CFolderTree *tree, std::wstring& path, ui64 clustersize, BOOL aligned, CFolderDialog *dialog);
+ 
+ 
+ public:
+diff --git a/PathUtil.cpp b/PathUtil.cpp
+index 8b01fea..a13c11c 100644
+--- a/PathUtil.cpp
++++ b/PathUtil.cpp
+@@ -140,4 +140,17 @@ std::wstring PrepareLongPath(const std::string& path) {
+ 	return PrepareLongPath(AnsiToWide(path));
+ }
+ 
++std::wstring::size_type AppendComponent(std::wstring& path, const wchar_t *component) {
++	std::wstring::size_type originalLength = path.size();
++	if (component == NULL || component[0] == L'\0') {
++		return originalLength;
++	}
++
++	if (!path.empty() && path.back() != L'\\') {
++		path += L'\\';
++	}
++	path += component;
++	return originalLength;
++}
++
+ } // namespace PathUtil
+diff --git a/PathUtil.h b/PathUtil.h
+index 3edea78..5ebb834 100644
+--- a/PathUtil.h
++++ b/PathUtil.h
+@@ -38,6 +38,9 @@ std::wstring GetAbsolutePath(const std::string& path);
+ std::wstring PrepareLongPath(const std::wstring& path);
+ std::wstring PrepareLongPath(const std::string& path);
+ 
++// Appends one path component and returns the path length before appending.
++std::wstring::size_type AppendComponent(std::wstring& path, const wchar_t *component);
++
+ } // namespace PathUtil
+ 
+ #endif // PATHUTIL_H
+diff --git a/tests/DiskUsage_test.cpp b/tests/DiskUsage_test.cpp
+index 852a76c..f12118a 100644
+--- a/tests/DiskUsage_test.cpp
++++ b/tests/DiskUsage_test.cpp
+@@ -1,9 +1,17 @@
+ #include "../DiskUsage.h"
+ 
+-#include <assert.h>
++#include <stdio.h>
+ #include <windows.h>
+ 
+-static void local_files_keep_cluster_rounded_size()
++#define CHECK(condition) \
++	do { \
++		if (!(condition)) { \
++			fprintf(stderr, "CHECK failed: %s at %s:%d\n", #condition, __FILE__, __LINE__); \
++			return 0; \
++		} \
++	} while (0)
++
++static int local_files_keep_cluster_rounded_size()
+ {
+ 	SM_FILE_SIZE_INFO info;
+ 	info.logical_size = 4097;
+@@ -11,32 +19,44 @@ static void local_files_keep_cluster_rounded_size()
+ 	info.attributes = FILE_ATTRIBUTE_ARCHIVE;
+ 	info.has_allocated_size = 0;
+ 
+-	assert(SM_ChooseDisplayedFileSize(&info, 4095, 0) == 4096);
++	CHECK(SM_ChooseDisplayedFileSize(&info, 4095, 0) == 4096);
++	return 1;
++}
++
++static int ordinary_files_do_not_need_allocated_size_lookup()
++{
++	CHECK(!SM_ShouldLoadAllocatedSize(FILE_ATTRIBUTE_ARCHIVE));
++	return 1;
+ }
+ 
+-static void ordinary_files_do_not_need_allocated_size_lookup()
++static int sparse_files_need_allocated_size_lookup()
+ {
+-	assert(!SM_ShouldLoadAllocatedSize(FILE_ATTRIBUTE_ARCHIVE));
++	CHECK(SM_ShouldLoadAllocatedSize(FILE_ATTRIBUTE_SPARSE_FILE));
++	return 1;
+ }
+ 
+-static void sparse_and_cloud_files_need_allocated_size_lookup()
++static int cloud_placeholders_do_not_need_allocated_size_lookup()
+ {
+-	assert(SM_ShouldLoadAllocatedSize(FILE_ATTRIBUTE_SPARSE_FILE));
+-	assert(SM_ShouldLoadAllocatedSize(FILE_ATTRIBUTE_UNPINNED));
++	CHECK(!SM_ShouldLoadAllocatedSize(FILE_ATTRIBUTE_OFFLINE));
++	CHECK(!SM_ShouldLoadAllocatedSize(FILE_ATTRIBUTE_UNPINNED));
++	CHECK(!SM_ShouldLoadAllocatedSize(FILE_ATTRIBUTE_RECALL_ON_OPEN));
++	CHECK(!SM_ShouldLoadAllocatedSize(FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS));
++	return 1;
+ }
+ 
+-static void sparse_and_offline_files_use_allocated_size()
++static int sparse_files_use_allocated_size()
+ {
+ 	SM_FILE_SIZE_INFO info;
+ 	info.logical_size = 119ULL * 1024ULL * 1024ULL * 1024ULL;
+ 	info.allocated_size = 57344;
+-	info.attributes = FILE_ATTRIBUTE_SPARSE_FILE | FILE_ATTRIBUTE_OFFLINE;
++	info.attributes = FILE_ATTRIBUTE_SPARSE_FILE;
+ 	info.has_allocated_size = 1;
+ 
+-	assert(SM_ChooseDisplayedFileSize(&info, 4095, 1) == 57344);
++	CHECK(SM_ChooseDisplayedFileSize(&info, 4095, 1) == 57344);
++	return 1;
+ }
+ 
+-static void unpinned_cloud_files_use_allocated_size()
++static int unpinned_cloud_files_use_zero_local_size()
+ {
+ 	SM_FILE_SIZE_INFO info;
+ 	info.logical_size = 50ULL * 1024ULL * 1024ULL * 1024ULL;
+@@ -44,10 +64,11 @@ static void unpinned_cloud_files_use_allocated_size()
+ 	info.attributes = FILE_ATTRIBUTE_UNPINNED;
+ 	info.has_allocated_size = 1;
+ 
+-	assert(SM_ChooseDisplayedFileSize(&info, 4095, 0) == 4096);
++	CHECK(SM_ChooseDisplayedFileSize(&info, 4095, 0) == 0);
++	return 1;
+ }
+ 
+-static void logical_size_is_preserved_for_details()
++static int logical_size_is_preserved_for_details()
+ {
+ 	SM_FILE_SIZE_INFO info;
+ 	info.logical_size = 123456789;
+@@ -55,16 +76,18 @@ static void logical_size_is_preserved_for_details()
+ 	info.attributes = FILE_ATTRIBUTE_REPARSE_POINT | FILE_ATTRIBUTE_OFFLINE;
+ 	info.has_allocated_size = 1;
+ 
+-	assert(SM_GetLogicalFileSize(&info) == 123456789);
++	CHECK(SM_GetLogicalFileSize(&info) == 123456789);
++	return 1;
+ }
+ 
+ int main()
+ {
+-	local_files_keep_cluster_rounded_size();
+-	ordinary_files_do_not_need_allocated_size_lookup();
+-	sparse_and_cloud_files_need_allocated_size_lookup();
+-	sparse_and_offline_files_use_allocated_size();
+-	unpinned_cloud_files_use_allocated_size();
+-	logical_size_is_preserved_for_details();
++	if (!local_files_keep_cluster_rounded_size()) return 1;
++	if (!ordinary_files_do_not_need_allocated_size_lookup()) return 1;
++	if (!sparse_files_need_allocated_size_lookup()) return 1;
++	if (!cloud_placeholders_do_not_need_allocated_size_lookup()) return 1;
++	if (!sparse_files_use_allocated_size()) return 1;
++	if (!unpinned_cloud_files_use_zero_local_size()) return 1;
++	if (!logical_size_is_preserved_for_details()) return 1;
+ 	return 0;
+ }
+diff --git a/tests/PathUtil_test.cpp b/tests/PathUtil_test.cpp
+index abdca7a..ee44337 100644
+--- a/tests/PathUtil_test.cpp
++++ b/tests/PathUtil_test.cpp
+@@ -1,77 +1,113 @@
+ #include "../PathUtil.h"
+-#include <assert.h>
+ #include <iostream>
++#include <stdio.h>
+ #include <windows.h>
+ 
+-void test_ansi_wide_conversion() {
++#define CHECK(condition) \
++	do { \
++		if (!(condition)) { \
++			fprintf(stderr, "CHECK failed: %s at %s:%d\n", #condition, __FILE__, __LINE__); \
++			return 0; \
++		} \
++	} while (0)
++
++int test_ansi_wide_conversion() {
+ 	std::string ansi = "C:\\Windows\\System32";
+ 	std::wstring wide = PathUtil::AnsiToWide(ansi);
+-	assert(wide == L"C:\\Windows\\System32");
++	CHECK(wide == L"C:\\Windows\\System32");
+ 
+ 	std::string ansi_back = PathUtil::WideToAnsi(wide);
+-	assert(ansi_back == ansi);
++	CHECK(ansi_back == ansi);
++	return 1;
+ }
+ 
+-void test_normalize_separators() {
+-	assert(PathUtil::NormalizeSeparators("C:/foo/bar") == "C:\\foo\\bar");
+-	assert(PathUtil::NormalizeSeparators("C:\\foo/bar") == "C:\\foo\\bar");
+-	assert(PathUtil::NormalizeSeparators(L"C:/foo/bar") == L"C:\\foo\\bar");
++int test_normalize_separators() {
++	CHECK(PathUtil::NormalizeSeparators("C:/foo/bar") == "C:\\foo\\bar");
++	CHECK(PathUtil::NormalizeSeparators("C:\\foo/bar") == "C:\\foo\\bar");
++	CHECK(PathUtil::NormalizeSeparators(L"C:/foo/bar") == L"C:\\foo\\bar");
++	return 1;
+ }
+ 
+-void test_join() {
+-	assert(PathUtil::Join("C:\\foo", "bar") == "C:\\foo\\bar");
+-	assert(PathUtil::Join("C:\\foo\\", "bar") == "C:\\foo\\bar");
+-	assert(PathUtil::Join("C:\\foo", "\\bar") == "C:\\foo\\bar");
+-	assert(PathUtil::Join("C:\\foo\\", "\\bar") == "C:\\foo\\bar");
+-	assert(PathUtil::Join("", "bar") == "bar");
+-	assert(PathUtil::Join("C:\\foo", "") == "C:\\foo");
+-
+-	assert(PathUtil::Join(L"C:\\foo", L"bar") == L"C:\\foo\\bar");
+-	assert(PathUtil::Join(L"C:\\foo\\", L"bar") == L"C:\\foo\\bar");
+-	assert(PathUtil::Join(L"C:\\foo", L"\\bar") == L"C:\\foo\\bar");
++int test_join() {
++	CHECK(PathUtil::Join("C:\\foo", "bar") == "C:\\foo\\bar");
++	CHECK(PathUtil::Join("C:\\foo\\", "bar") == "C:\\foo\\bar");
++	CHECK(PathUtil::Join("C:\\foo", "\\bar") == "C:\\foo\\bar");
++	CHECK(PathUtil::Join("C:\\foo\\", "\\bar") == "C:\\foo\\bar");
++	CHECK(PathUtil::Join("", "bar") == "bar");
++	CHECK(PathUtil::Join("C:\\foo", "") == "C:\\foo");
++
++	CHECK(PathUtil::Join(L"C:\\foo", L"bar") == L"C:\\foo\\bar");
++	CHECK(PathUtil::Join(L"C:\\foo\\", L"bar") == L"C:\\foo\\bar");
++	CHECK(PathUtil::Join(L"C:\\foo", L"\\bar") == L"C:\\foo\\bar");
++	return 1;
+ }
+ 
+-void test_ensure_trailing_backslash() {
+-	assert(PathUtil::EnsureTrailingBackslash("C:\\foo") == "C:\\foo\\");
+-	assert(PathUtil::EnsureTrailingBackslash("C:\\foo\\") == "C:\\foo\\");
+-	assert(PathUtil::EnsureTrailingBackslash("") == "\\");
++int test_ensure_trailing_backslash() {
++	CHECK(PathUtil::EnsureTrailingBackslash("C:\\foo") == "C:\\foo\\");
++	CHECK(PathUtil::EnsureTrailingBackslash("C:\\foo\\") == "C:\\foo\\");
++	CHECK(PathUtil::EnsureTrailingBackslash("") == "\\");
+ 
+-	assert(PathUtil::EnsureTrailingBackslash(L"C:\\foo") == L"C:\\foo\\");
++	CHECK(PathUtil::EnsureTrailingBackslash(L"C:\\foo") == L"C:\\foo\\");
++	return 1;
+ }
+ 
+-void test_get_absolute_path() {
++int test_get_absolute_path() {
+ 	// Relative path "." should resolve to the current directory
+ 	std::wstring current = PathUtil::GetAbsolutePath(L".");
+-	assert(!current.empty());
+-	assert(current.find(L"\\..") == std::wstring::npos);
++	CHECK(!current.empty());
++	CHECK(current.find(L"\\..") == std::wstring::npos);
+ 
+ 	// Resolving dot-dot path
+ 	std::wstring path_dot_dot = PathUtil::GetAbsolutePath(L"C:\\Windows\\System32\\..");
+-	assert(path_dot_dot == L"C:\\Windows");
++	CHECK(path_dot_dot == L"C:\\Windows");
++	return 1;
+ }
+ 
+-void test_prepare_long_path() {
++int test_prepare_long_path() {
+ 	// Already prefixed local path
+-	assert(PathUtil::PrepareLongPath(L"\\\\?\\C:\\foo\\bar") == L"\\\\?\\C:\\foo\\bar");
++	CHECK(PathUtil::PrepareLongPath(L"\\\\?\\C:\\foo\\bar") == L"\\\\?\\C:\\foo\\bar");
+ 	// Already prefixed device path
+-	assert(PathUtil::PrepareLongPath(L"\\\\.\\PhysicalDrive0") == L"\\\\.\\PhysicalDrive0");
++	CHECK(PathUtil::PrepareLongPath(L"\\\\.\\PhysicalDrive0") == L"\\\\.\\PhysicalDrive0");
+ 
+ 	// Local path
+-	assert(PathUtil::PrepareLongPath(L"C:\\foo\\bar") == L"\\\\?\\C:\\foo\\bar");
+-	assert(PathUtil::PrepareLongPath("C:\\foo\\bar") == L"\\\\?\\C:\\foo\\bar");
++	CHECK(PathUtil::PrepareLongPath(L"C:\\foo\\bar") == L"\\\\?\\C:\\foo\\bar");
++	CHECK(PathUtil::PrepareLongPath("C:\\foo\\bar") == L"\\\\?\\C:\\foo\\bar");
+ 
+ 	// UNC path
+-	assert(PathUtil::PrepareLongPath(L"\\\\server\\share\\file") == L"\\\\?\\UNC\\server\\share\\file");
+-	assert(PathUtil::PrepareLongPath("\\\\server\\share\\file") == L"\\\\?\\UNC\\server\\share\\file");
++	CHECK(PathUtil::PrepareLongPath(L"\\\\server\\share\\file") == L"\\\\?\\UNC\\server\\share\\file");
++	CHECK(PathUtil::PrepareLongPath("\\\\server\\share\\file") == L"\\\\?\\UNC\\server\\share\\file");
++	return 1;
++}
++
++int test_append_component_returns_original_length() {
++	std::wstring path = L"\\\\?\\C:\\root\\";
++	size_t original = PathUtil::AppendComponent(path, L"child");
++
++	CHECK(original == 12);
++	CHECK(path == L"\\\\?\\C:\\root\\child");
++
++	path.resize(original);
++	CHECK(path == L"\\\\?\\C:\\root\\");
++	return 1;
++}
++
++int test_append_component_adds_separator_when_needed() {
++	std::wstring path = L"C:\\root";
++	PathUtil::AppendComponent(path, L"child");
++
++	CHECK(path == L"C:\\root\\child");
++	return 1;
+ }
+ 
+ int main() {
+-	test_ansi_wide_conversion();
+-	test_normalize_separators();
+-	test_join();
+-	test_ensure_trailing_backslash();
+-	test_get_absolute_path();
+-	test_prepare_long_path();
++	if (!test_ansi_wide_conversion()) return 1;
++	if (!test_normalize_separators()) return 1;
++	if (!test_join()) return 1;
++	if (!test_ensure_trailing_backslash()) return 1;
++	if (!test_get_absolute_path()) return 1;
++	if (!test_prepare_long_path()) return 1;
++	if (!test_append_component_returns_original_length()) return 1;
++	if (!test_append_component_adds_separator_when_needed()) return 1;
+ 	std::cout << "All PathUtil tests passed successfully!\n";
+ 	return 0;
+ }

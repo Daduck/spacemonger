@@ -12,18 +12,25 @@ SM_UINT64 SM_GetLogicalFileSize(const SM_FILE_SIZE_INFO *info)
 	return info->logical_size;
 }
 
-int SM_ShouldLoadAllocatedSize(DWORD attributes)
+static int SM_IsCloudPlaceholder(DWORD attributes)
 {
 	DWORD flags =
-		FILE_ATTRIBUTE_COMPRESSED |
 		FILE_ATTRIBUTE_OFFLINE |
-		FILE_ATTRIBUTE_REPARSE_POINT |
-		FILE_ATTRIBUTE_SPARSE_FILE |
 		FILE_ATTRIBUTE_RECALL_ON_OPEN |
 		FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS |
 		FILE_ATTRIBUTE_UNPINNED;
 
 	return (attributes & flags) != 0;
+}
+
+int SM_ShouldLoadAllocatedSize(DWORD attributes)
+{
+	DWORD flags =
+		FILE_ATTRIBUTE_COMPRESSED |
+		FILE_ATTRIBUTE_REPARSE_POINT |
+		FILE_ATTRIBUTE_SPARSE_FILE;
+
+	return !SM_IsCloudPlaceholder(attributes) && (attributes & flags) != 0;
 }
 
 static SM_UINT64 SM_LegacyClusterSize(SM_UINT64 logical_size, SM_UINT64 cluster_mask, int aligned)
@@ -40,6 +47,9 @@ static SM_UINT64 SM_LegacyClusterSize(SM_UINT64 logical_size, SM_UINT64 cluster_
 
 SM_UINT64 SM_ChooseDisplayedFileSize(const SM_FILE_SIZE_INFO *info, SM_UINT64 cluster_mask, int aligned)
 {
+	if (SM_IsCloudPlaceholder(info->attributes))
+		return 0;
+
 	if (info->has_allocated_size && SM_ShouldLoadAllocatedSize(info->attributes))
 		return info->allocated_size;
 
@@ -92,6 +102,12 @@ int SM_LoadFileSizeInfo(const char *path, const WIN32_FIND_DATA *finddata, SM_FI
 	info->attributes = finddata->dwFileAttributes;
 	info->has_allocated_size = 0;
 
+	if (SM_IsCloudPlaceholder(info->attributes)) {
+		info->allocated_size = 0;
+		info->has_allocated_size = 1;
+		return 1;
+	}
+
 	if (!SM_ShouldLoadAllocatedSize(info->attributes))
 		return 1;
 
@@ -122,6 +138,12 @@ int SM_LoadFileSizeInfoW(const wchar_t *path, const WIN32_FIND_DATAW *finddata, 
 	info->allocated_size = 0;
 	info->attributes = finddata->dwFileAttributes;
 	info->has_allocated_size = 0;
+
+	if (SM_IsCloudPlaceholder(info->attributes)) {
+		info->allocated_size = 0;
+		info->has_allocated_size = 1;
+		return 1;
+	}
 
 	if (!SM_ShouldLoadAllocatedSize(info->attributes))
 		return 1;

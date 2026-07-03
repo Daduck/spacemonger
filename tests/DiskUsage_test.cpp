@@ -1,9 +1,17 @@
 #include "../DiskUsage.h"
 
-#include <assert.h>
+#include <stdio.h>
 #include <windows.h>
 
-static void local_files_keep_cluster_rounded_size()
+#define CHECK(condition) \
+	do { \
+		if (!(condition)) { \
+			fprintf(stderr, "CHECK failed: %s at %s:%d\n", #condition, __FILE__, __LINE__); \
+			return 0; \
+		} \
+	} while (0)
+
+static int local_files_keep_cluster_rounded_size()
 {
 	SM_FILE_SIZE_INFO info;
 	info.logical_size = 4097;
@@ -11,32 +19,44 @@ static void local_files_keep_cluster_rounded_size()
 	info.attributes = FILE_ATTRIBUTE_ARCHIVE;
 	info.has_allocated_size = 0;
 
-	assert(SM_ChooseDisplayedFileSize(&info, 4095, 0) == 4096);
+	CHECK(SM_ChooseDisplayedFileSize(&info, 4095, 0) == 4096);
+	return 1;
 }
 
-static void ordinary_files_do_not_need_allocated_size_lookup()
+static int ordinary_files_do_not_need_allocated_size_lookup()
 {
-	assert(!SM_ShouldLoadAllocatedSize(FILE_ATTRIBUTE_ARCHIVE));
+	CHECK(!SM_ShouldLoadAllocatedSize(FILE_ATTRIBUTE_ARCHIVE));
+	return 1;
 }
 
-static void sparse_and_cloud_files_need_allocated_size_lookup()
+static int sparse_files_need_allocated_size_lookup()
 {
-	assert(SM_ShouldLoadAllocatedSize(FILE_ATTRIBUTE_SPARSE_FILE));
-	assert(SM_ShouldLoadAllocatedSize(FILE_ATTRIBUTE_UNPINNED));
+	CHECK(SM_ShouldLoadAllocatedSize(FILE_ATTRIBUTE_SPARSE_FILE));
+	return 1;
 }
 
-static void sparse_and_offline_files_use_allocated_size()
+static int cloud_placeholders_do_not_need_allocated_size_lookup()
+{
+	CHECK(!SM_ShouldLoadAllocatedSize(FILE_ATTRIBUTE_OFFLINE));
+	CHECK(!SM_ShouldLoadAllocatedSize(FILE_ATTRIBUTE_UNPINNED));
+	CHECK(!SM_ShouldLoadAllocatedSize(FILE_ATTRIBUTE_RECALL_ON_OPEN));
+	CHECK(!SM_ShouldLoadAllocatedSize(FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS));
+	return 1;
+}
+
+static int sparse_files_use_allocated_size()
 {
 	SM_FILE_SIZE_INFO info;
 	info.logical_size = 119ULL * 1024ULL * 1024ULL * 1024ULL;
 	info.allocated_size = 57344;
-	info.attributes = FILE_ATTRIBUTE_SPARSE_FILE | FILE_ATTRIBUTE_OFFLINE;
+	info.attributes = FILE_ATTRIBUTE_SPARSE_FILE;
 	info.has_allocated_size = 1;
 
-	assert(SM_ChooseDisplayedFileSize(&info, 4095, 1) == 57344);
+	CHECK(SM_ChooseDisplayedFileSize(&info, 4095, 1) == 57344);
+	return 1;
 }
 
-static void unpinned_cloud_files_use_allocated_size()
+static int unpinned_cloud_files_use_zero_local_size()
 {
 	SM_FILE_SIZE_INFO info;
 	info.logical_size = 50ULL * 1024ULL * 1024ULL * 1024ULL;
@@ -44,10 +64,11 @@ static void unpinned_cloud_files_use_allocated_size()
 	info.attributes = FILE_ATTRIBUTE_UNPINNED;
 	info.has_allocated_size = 1;
 
-	assert(SM_ChooseDisplayedFileSize(&info, 4095, 0) == 4096);
+	CHECK(SM_ChooseDisplayedFileSize(&info, 4095, 0) == 0);
+	return 1;
 }
 
-static void logical_size_is_preserved_for_details()
+static int logical_size_is_preserved_for_details()
 {
 	SM_FILE_SIZE_INFO info;
 	info.logical_size = 123456789;
@@ -55,16 +76,18 @@ static void logical_size_is_preserved_for_details()
 	info.attributes = FILE_ATTRIBUTE_REPARSE_POINT | FILE_ATTRIBUTE_OFFLINE;
 	info.has_allocated_size = 1;
 
-	assert(SM_GetLogicalFileSize(&info) == 123456789);
+	CHECK(SM_GetLogicalFileSize(&info) == 123456789);
+	return 1;
 }
 
 int main()
 {
-	local_files_keep_cluster_rounded_size();
-	ordinary_files_do_not_need_allocated_size_lookup();
-	sparse_and_cloud_files_need_allocated_size_lookup();
-	sparse_and_offline_files_use_allocated_size();
-	unpinned_cloud_files_use_allocated_size();
-	logical_size_is_preserved_for_details();
+	if (!local_files_keep_cluster_rounded_size()) return 1;
+	if (!ordinary_files_do_not_need_allocated_size_lookup()) return 1;
+	if (!sparse_files_need_allocated_size_lookup()) return 1;
+	if (!cloud_placeholders_do_not_need_allocated_size_lookup()) return 1;
+	if (!sparse_files_use_allocated_size()) return 1;
+	if (!unpinned_cloud_files_use_zero_local_size()) return 1;
+	if (!logical_size_is_preserved_for_details()) return 1;
 	return 0;
 }

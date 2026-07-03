@@ -36,7 +36,7 @@ private:
 	void EightBitCountingSort(ui64 *dsize, ui64 *ssize, ui32 count, ui32 bitpos,
 		char **dnames, char **snames, CFolder **dkids, CFolder **skids,
 		ui64 *dasize, ui64 *sasize, ui64 *dtimes, ui64 *stimes);
-	BOOL LoadFolder(CFolderTree *tree, const std::wstring& path, ui64 clustersize, BOOL aligned, CFolderDialog *dialog);
+	BOOL LoadFolder(CFolderTree *tree, std::wstring& path, ui64 clustersize, BOOL aligned, CFolderDialog *dialog);
 
 
 public:

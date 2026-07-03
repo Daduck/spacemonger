@@ -140,4 +140,17 @@ std::wstring PrepareLongPath(const std::string& path) {
 	return PrepareLongPath(AnsiToWide(path));
 }
 
+std::wstring::size_type AppendComponent(std::wstring& path, const wchar_t *component) {
+	std::wstring::size_type originalLength = path.size();
+	if (component == NULL || component[0] == L'\0') {
+		return originalLength;
+	}
+
+	if (!path.empty() && path.back() != L'\\') {
+		path += L'\\';
+	}
+	path += component;
+	return originalLength;
+}
+
 } // namespace PathUtil

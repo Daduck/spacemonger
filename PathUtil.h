@@ -38,6 +38,9 @@ std::wstring GetAbsolutePath(const std::string& path);
 std::wstring PrepareLongPath(const std::wstring& path);
 std::wstring PrepareLongPath(const std::string& path);
 
+// Appends one path component and returns the path length before appending.
+std::wstring::size_type AppendComponent(std::wstring& path, const wchar_t *component);
+
 } // namespace PathUtil
 
 #endif // PATHUTIL_H

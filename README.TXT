@@ -1,5 +1,5 @@
 
-SpaceMonger Version 1.4.0
+SpaceMonger Version 1.4.1
 -------------------------
 
 
@@ -19,13 +19,11 @@ The latest version of SpaceMonger is always available at its web page:
 SYSTEM REQUIREMENTS
 -------------------
 
-SpaceMonger should run on any version of Windows 95, 98, or NT.  It has
-been tested on all three.  It will probably run fine on Windows 2000, but
-has not been officially tested on Windows 2000.  It should be able to run
-on any computer that can run Windows 95, 98, or NT; there are no
-additional space or memory requirements, although we do recommend you have
-at least 4 megabytes of memory installed in your computer if you want it
-to run efficiently.
+SpaceMonger 1.4.1 is optimized for modern Windows environments. It should run
+flawlessly on Windows 10, Windows 11, and modern Windows Server editions.
+Because it is a native C++ MFC application, it has virtually zero dependencies
+and remains incredibly lightweight. Any PC capable of running Windows today
+has more than enough memory and CPU power to run SpaceMonger efficiently.
 
 
 INSTALLATION
@@ -40,24 +38,12 @@ but you don't have to put it there.)
 Double-click on it to run it.
 
 
-NOTE TO WINDOWS 2000 USERS:
----------------------------
+KNOWN LIMITATIONS
+-----------------
 
-SpaceMonger will run on Windows 2000.  However, version 1.4.0 will NOT
-correctly report space used by hard links, junction points, or sparse
-files.  So if you use Windows 2000, here is what you should expect:
+SpaceMonger is designed for extreme scanning speed. Because of this, it relies on fast directory-index queries rather than opening individual files.
 
-   *  Hard linked files will exist in both places:  There will appear
-       to be a full copy of the file everywhere a hard link exists,
-       so these files will get over-counted.
-   *  Junction points and mount points will be treated as though they
-       are real folders, so their contents will be over-counted as well.
-   *  Sparse files will not be treated as sparse:  If you have a
-       10-megabyte sparse file that really only uses one megabyte of
-       disk space, it will still be counted as 10 megabytes.
-
-Our crack research team is investigating these problems and should be
-able to resolve some of them soon.
+As a trade-off, SpaceMonger does not track Windows Hard Links. If a file is hard-linked in multiple directories, it will appear as a full copy in each location, and its disk space will be over-counted. (Note: This does not apply to Directory Junctions, Symlinks, Sparse Files, or Cloud Placeholders, which are all correctly handled and will not inflate your disk usage!)
 
 
 FIRST-TIME INSTRUCTIONS
@@ -120,6 +106,15 @@ users of the program to give away copies to their friends.
 
 WHAT'S NEW
 ----------
+
+Between 1.4.0 and 1.4.1 (Modernization Update)
+   * Maintained and modernized by Johnny J. Andersen - Anderki.dk.
+   * Replaced legacy VC6 build system with modern CMake and Visual Studio 2022 support.
+   * Upgraded filesystem scanner to use Unicode APIs, enabling support for modern Windows Long Paths (>260 characters).
+   * Fixed infinite recursion bugs with modern Windows Reparse Points (Symlinks, Directory Junctions, OneDrive placeholders).
+   * Eradicated unsafe C-style string formatting to prevent buffer overflows.
+   * Added GitHub Actions CI workflow and unit tests.
+   * Extreme performance optimizations to scanning string management.
 
 Between 1.3.5 and 1.4.0
    * Internals rewritten to support multiple foreign langauges.

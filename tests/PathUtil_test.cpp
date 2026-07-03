@@ -1,77 +1,113 @@
 #include "../PathUtil.h"
-#include <assert.h>
 #include <iostream>
+#include <stdio.h>
 #include <windows.h>
 
-void test_ansi_wide_conversion() {
+#define CHECK(condition) \
+	do { \
+		if (!(condition)) { \
+			fprintf(stderr, "CHECK failed: %s at %s:%d\n", #condition, __FILE__, __LINE__); \
+			return 0; \
+		} \
+	} while (0)
+
+int test_ansi_wide_conversion() {
 	std::string ansi = "C:\\Windows\\System32";
 	std::wstring wide = PathUtil::AnsiToWide(ansi);
-	assert(wide == L"C:\\Windows\\System32");
+	CHECK(wide == L"C:\\Windows\\System32");
 
 	std::string ansi_back = PathUtil::WideToAnsi(wide);
-	assert(ansi_back == ansi);
+	CHECK(ansi_back == ansi);
+	return 1;
 }
 
-void test_normalize_separators() {
-	assert(PathUtil::NormalizeSeparators("C:/foo/bar") == "C:\\foo\\bar");
-	assert(PathUtil::NormalizeSeparators("C:\\foo/bar") == "C:\\foo\\bar");
-	assert(PathUtil::NormalizeSeparators(L"C:/foo/bar") == L"C:\\foo\\bar");
+int test_normalize_separators() {
+	CHECK(PathUtil::NormalizeSeparators("C:/foo/bar") == "C:\\foo\\bar");
+	CHECK(PathUtil::NormalizeSeparators("C:\\foo/bar") == "C:\\foo\\bar");
+	CHECK(PathUtil::NormalizeSeparators(L"C:/foo/bar") == L"C:\\foo\\bar");
+	return 1;
 }
 
-void test_join() {
-	assert(PathUtil::Join("C:\\foo", "bar") == "C:\\foo\\bar");
-	assert(PathUtil::Join("C:\\foo\\", "bar") == "C:\\foo\\bar");
-	assert(PathUtil::Join("C:\\foo", "\\bar") == "C:\\foo\\bar");
-	assert(PathUtil::Join("C:\\foo\\", "\\bar") == "C:\\foo\\bar");
-	assert(PathUtil::Join("", "bar") == "bar");
-	assert(PathUtil::Join("C:\\foo", "") == "C:\\foo");
+int test_join() {
+	CHECK(PathUtil::Join("C:\\foo", "bar") == "C:\\foo\\bar");
+	CHECK(PathUtil::Join("C:\\foo\\", "bar") == "C:\\foo\\bar");
+	CHECK(PathUtil::Join("C:\\foo", "\\bar") == "C:\\foo\\bar");
+	CHECK(PathUtil::Join("C:\\foo\\", "\\bar") == "C:\\foo\\bar");
+	CHECK(PathUtil::Join("", "bar") == "bar");
+	CHECK(PathUtil::Join("C:\\foo", "") == "C:\\foo");
 
-	assert(PathUtil::Join(L"C:\\foo", L"bar") == L"C:\\foo\\bar");
-	assert(PathUtil::Join(L"C:\\foo\\", L"bar") == L"C:\\foo\\bar");
-	assert(PathUtil::Join(L"C:\\foo", L"\\bar") == L"C:\\foo\\bar");
+	CHECK(PathUtil::Join(L"C:\\foo", L"bar") == L"C:\\foo\\bar");
+	CHECK(PathUtil::Join(L"C:\\foo\\", L"bar") == L"C:\\foo\\bar");
+	CHECK(PathUtil::Join(L"C:\\foo", L"\\bar") == L"C:\\foo\\bar");
+	return 1;
 }
 
-void test_ensure_trailing_backslash() {
-	assert(PathUtil::EnsureTrailingBackslash("C:\\foo") == "C:\\foo\\");
-	assert(PathUtil::EnsureTrailingBackslash("C:\\foo\\") == "C:\\foo\\");
-	assert(PathUtil::EnsureTrailingBackslash("") == "\\");
+int test_ensure_trailing_backslash() {
+	CHECK(PathUtil::EnsureTrailingBackslash("C:\\foo") == "C:\\foo\\");
+	CHECK(PathUtil::EnsureTrailingBackslash("C:\\foo\\") == "C:\\foo\\");
+	CHECK(PathUtil::EnsureTrailingBackslash("") == "\\");
 
-	assert(PathUtil::EnsureTrailingBackslash(L"C:\\foo") == L"C:\\foo\\");
+	CHECK(PathUtil::EnsureTrailingBackslash(L"C:\\foo") == L"C:\\foo\\");
+	return 1;
 }
 
-void test_get_absolute_path() {
+int test_get_absolute_path() {
 	// Relative path "." should resolve to the current directory
 	std::wstring current = PathUtil::GetAbsolutePath(L".");
-	assert(!current.empty());
-	assert(current.find(L"\\..") == std::wstring::npos);
+	CHECK(!current.empty());
+	CHECK(current.find(L"\\..") == std::wstring::npos);
 
 	// Resolving dot-dot path
 	std::wstring path_dot_dot = PathUtil::GetAbsolutePath(L"C:\\Windows\\System32\\..");
-	assert(path_dot_dot == L"C:\\Windows");
+	CHECK(path_dot_dot == L"C:\\Windows");
+	return 1;
 }
 
-void test_prepare_long_path() {
+int test_prepare_long_path() {
 	// Already prefixed local path
-	assert(PathUtil::PrepareLongPath(L"\\\\?\\C:\\foo\\bar") == L"\\\\?\\C:\\foo\\bar");
+	CHECK(PathUtil::PrepareLongPath(L"\\\\?\\C:\\foo\\bar") == L"\\\\?\\C:\\foo\\bar");
 	// Already prefixed device path
-	assert(PathUtil::PrepareLongPath(L"\\\\.\\PhysicalDrive0") == L"\\\\.\\PhysicalDrive0");
+	CHECK(PathUtil::PrepareLongPath(L"\\\\.\\PhysicalDrive0") == L"\\\\.\\PhysicalDrive0");
 
 	// Local path
-	assert(PathUtil::PrepareLongPath(L"C:\\foo\\bar") == L"\\\\?\\C:\\foo\\bar");
-	assert(PathUtil::PrepareLongPath("C:\\foo\\bar") == L"\\\\?\\C:\\foo\\bar");
+	CHECK(PathUtil::PrepareLongPath(L"C:\\foo\\bar") == L"\\\\?\\C:\\foo\\bar");
+	CHECK(PathUtil::PrepareLongPath("C:\\foo\\bar") == L"\\\\?\\C:\\foo\\bar");
 
 	// UNC path
-	assert(PathUtil::PrepareLongPath(L"\\\\server\\share\\file") == L"\\\\?\\UNC\\server\\share\\file");
-	assert(PathUtil::PrepareLongPath("\\\\server\\share\\file") == L"\\\\?\\UNC\\server\\share\\file");
+	CHECK(PathUtil::PrepareLongPath(L"\\\\server\\share\\file") == L"\\\\?\\UNC\\server\\share\\file");
+	CHECK(PathUtil::PrepareLongPath("\\\\server\\share\\file") == L"\\\\?\\UNC\\server\\share\\file");
+	return 1;
+}
+
+int test_append_component_returns_original_length() {
+	std::wstring path = L"\\\\?\\C:\\root\\";
+	size_t original = PathUtil::AppendComponent(path, L"child");
+
+	CHECK(original == 12);
+	CHECK(path == L"\\\\?\\C:\\root\\child");
+
+	path.resize(original);
+	CHECK(path == L"\\\\?\\C:\\root\\");
+	return 1;
+}
+
+int test_append_component_adds_separator_when_needed() {
+	std::wstring path = L"C:\\root";
+	PathUtil::AppendComponent(path, L"child");
+
+	CHECK(path == L"C:\\root\\child");
+	return 1;
 }
 
 int main() {
-	test_ansi_wide_conversion();
-	test_normalize_separators();
-	test_join();
-	test_ensure_trailing_backslash();
-	test_get_absolute_path();
-	test_prepare_long_path();
+	if (!test_ansi_wide_conversion()) return 1;
+	if (!test_normalize_separators()) return 1;
+	if (!test_join()) return 1;
+	if (!test_ensure_trailing_backslash()) return 1;
+	if (!test_get_absolute_path()) return 1;
+	if (!test_prepare_long_path()) return 1;
+	if (!test_append_component_returns_original_length()) return 1;
+	if (!test_append_component_adds_separator_when_needed()) return 1;
 	std::cout << "All PathUtil tests passed successfully!\n";
 	return 0;
 }

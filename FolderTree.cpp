@@ -342,10 +342,7 @@ static ui32 strxcpy(char *dest, const char *src)
 
 BOOL CFolder::LoadFolderInitial(CFolderTree *tree, const char *name, ui64 clustersize, CFolderDialog *dialog)
 {
-	// Convert input name to Wide path
 	std::wstring widePath = PathUtil::AnsiToWide(name);
-	
-	// Resolve absolute path
 	std::wstring absPath = PathUtil::GetAbsolutePath(widePath);
 	absPath = PathUtil::EnsureTrailingBackslash(absPath);
 	
@@ -369,22 +366,25 @@ BOOL CFolder::LoadFolderInitial(CFolderTree *tree, const char *name, ui64 cluste
 	while (clusterbits--) clustermod <<= 1;
 	aligned = (clustermod == clustersize);
 
-	return LoadFolder(tree, absPath, clustersize-1, aligned, dialog);
+	std::wstring preparedPath = PathUtil::PrepareLongPath(absPath);
+	preparedPath = PathUtil::EnsureTrailingBackslash(preparedPath);
+
+	return LoadFolder(tree, preparedPath, clustersize-1, aligned, dialog);
 }
 
-BOOL CFolder::LoadFolder(CFolderTree *tree, const std::wstring& path, ui64 clustersize, BOOL aligned, CFolderDialog *dialog)
+BOOL CFolder::LoadFolder(CFolderTree *tree, std::wstring& path, ui64 clustersize, BOOL aligned, CFolderDialog *dialog)
 {
 	WIN32_FIND_DATAW finddata;
 	BOOL gotfile;
 	HANDLE handle;
 	ui64 size;
 	static DWORD last_tick = 0;
+	std::wstring::size_type baseLength;
 
-	// Use our new PathUtil to safely construct search path
-	std::wstring searchPattern = PathUtil::Join(path, L"*.*");
-	std::wstring preparedSearchPattern = PathUtil::PrepareLongPath(searchPattern);
+	baseLength = PathUtil::AppendComponent(path, L"*.*");
 
-	handle = FindFirstFileW(preparedSearchPattern.c_str(), &finddata);
+	handle = FindFirstFileW(path.c_str(), &finddata);
+	path.resize(baseLength);
 	gotfile = (handle != INVALID_HANDLE_VALUE);
 	while (gotfile && !dialog->cancelled) {
 		// Ignore "." and ".."
@@ -413,23 +413,26 @@ BOOL CFolder::LoadFolder(CFolderTree *tree, const std::wstring& path, ui64 clust
 		if (finddata.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
 			if (dialog != NULL)
 				dialog->IncFolders();
-			std::wstring nextPath = PathUtil::Join(path, finddata.cFileName);
+			std::wstring::size_type childLength = PathUtil::AppendComponent(path, finddata.cFileName);
+			if (!path.empty() && path.back() != L'\\')
+				path += L'\\';
+
 			CFolder *newfolder = new CFolder;
-			newfolder->LoadFolder(tree, nextPath, clustersize, aligned, dialog);
+			newfolder->LoadFolder(tree, path, clustersize, aligned, dialog);
 
 			std::string ansiName = PathUtil::WideToAnsi(finddata.cFileName);
 			AddFolder(tree, ansiName.c_str(), (ui32)ansiName.size(), newfolder,
 				*(ui64 *)&finddata.ftLastWriteTime);
+			path.resize(childLength);
 		}
 		else {
 			// Process files.
 			if (dialog != NULL) dialog->IncFiles();
 			
-			std::wstring filePath = PathUtil::Join(path, finddata.cFileName);
-			std::wstring preparedFilePath = PathUtil::PrepareLongPath(filePath);
+			std::wstring::size_type fileLength = PathUtil::AppendComponent(path, finddata.cFileName);
 
 			SM_FILE_SIZE_INFO sizeinfo;
-			SM_LoadFileSizeInfoW(preparedFilePath.c_str(), &finddata, &sizeinfo);
+			SM_LoadFileSizeInfoW(path.c_str(), &finddata, &sizeinfo);
 
 			ui64 actualsize = (ui64)SM_GetLogicalFileSize(&sizeinfo);
 			size = (ui64)SM_ChooseDisplayedFileSize(&sizeinfo, clustersize, aligned);
@@ -437,6 +440,7 @@ BOOL CFolder::LoadFolder(CFolderTree *tree, const std::wstring& path, ui64 clust
 			std::string ansiName = PathUtil::WideToAnsi(finddata.cFileName);
 			AddFile(tree, ansiName.c_str(), (ui32)ansiName.size(), size, actualsize,
 				*(ui64 *)&finddata.ftLastWriteTime);
+			path.resize(fileLength);
 		}
 
 	nextfile:
@@ -448,7 +452,7 @@ BOOL CFolder::LoadFolder(CFolderTree *tree, const std::wstring& path, ui64 clust
 			last_tick = tick;
 			MSG msg;
 			if (dialog != NULL) {
-				std::string ansiPath = PathUtil::WideToAnsi(PathUtil::EnsureTrailingBackslash(path));
+				std::string ansiPath = PathUtil::WideToAnsi(path);
 				dialog->SetPath(tree, ansiPath.c_str(), this);
 			}
 			while (::PeekMessage(&msg, 0, 0, 0, PM_REMOVE)) {
