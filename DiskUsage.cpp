@@ -1,5 +1,16 @@
 #include "DiskUsage.h"
 
+// Fallbacks for older Windows SDKs that might be used on CI runners
+#ifndef FILE_ATTRIBUTE_RECALL_ON_OPEN
+#define FILE_ATTRIBUTE_RECALL_ON_OPEN 0x00040000
+#endif
+#ifndef FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS
+#define FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS 0x00400000
+#endif
+#ifndef FILE_ATTRIBUTE_UNPINNED
+#define FILE_ATTRIBUTE_UNPINNED 0x00100000
+#endif
+
 typedef DWORD (WINAPI *SM_GetCompressedFileSizeFunc)(LPCSTR filename, LPDWORD high_size);
 
 SM_UINT64 SM_MakeFileSize(DWORD low, DWORD high)
