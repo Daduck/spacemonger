@@ -83,7 +83,7 @@ void CMainFrame::OnDestroy(void)
 	theApp.m_settings.showcmd = w.showCmd;
 }
 
-void CMainFrame::OnActivateApp(BOOL bActive, HTASK hTask)
+void CMainFrame::OnActivateApp(BOOL bActive, DWORD dwThreadID)
 {
 	if (bActive) {
 		CSpaceMonger *monger = (CSpaceMonger *)AfxGetApp();

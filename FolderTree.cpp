@@ -2,6 +2,7 @@
 #include "stdafx.h"
 #include "spacemonger.h"
 #include "FolderTree.h"
+#include "DiskUsage.h"
 #include "Lang.h"
 
 #include <io.h>
@@ -426,7 +427,7 @@ BOOL CFolder::LoadFolder(CFolderTree *tree, char *name, ui32 namelen, ui64 clust
 						OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, 0);
 
 			// Retrieve the reparse information for the object.
-			BYTE reparseBuffer[MAX_REPARSE_SIZE];
+			BYTE reparseBuffer[MAXIMUM_REPARSE_DATA_BUFFER_SIZE];
 			PREPARSE_GUID_DATA_BUFFER reparseInfo = (PREPARSE_GUID_DATA_BUFFER)reparseBuffer;
 			DWORD returnedLength;
 			DWORD result = DeviceIoControl(fileHandle, FSCTL_GET_REPARSE_POINT,
@@ -441,7 +442,7 @@ BOOL CFolder::LoadFolder(CFolderTree *tree, char *name, ui32 namelen, ui64 clust
 				ULONG msresult = IsReparseTagMicrosoft(reparseInfo->ReparseTag);
 				if (msresult) {
 					switch (reparseInfo->ReparseTag) {
-					case 0x80000000|IO_REPARSE_TAG_SYMBOLIC_LINK:
+					case IO_REPARSE_TAG_SYMLINK:
 					case IO_REPARSE_TAG_MOUNT_POINT:
 						CloseHandle(fileHandle);
 						goto nextfile;
@@ -468,11 +469,10 @@ BOOL CFolder::LoadFolder(CFolderTree *tree, char *name, ui32 namelen, ui64 clust
 		else {
 			// Process files.
 			if (dialog != NULL) dialog->IncFiles();
-			// We round up to the cluster size because that's the
-			// smallest the file can get
-			ui64 actualsize = (ui64)finddata.nFileSizeLow + ((ui64)finddata.nFileSizeHigh << 32);
-			if (aligned) size = (actualsize+clustersize) & clustersize;
-			else size = actualsize - (actualsize % (clustersize+1));
+			SM_FILE_SIZE_INFO sizeinfo;
+			SM_LoadFileSizeInfo(name, &finddata, &sizeinfo);
+			ui64 actualsize = (ui64)SM_GetLogicalFileSize(&sizeinfo);
+			size = (ui64)SM_ChooseDisplayedFileSize(&sizeinfo, clustersize, aligned);
 			AddFile(tree, finddata.cFileName, newlen-namelen, size, actualsize,
 				*(ui64 *)&finddata.ftLastWriteTime);
 		}

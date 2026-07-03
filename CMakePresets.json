@@ -1,0 +1,34 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "vs2022-win32",
+      "displayName": "Visual Studio 2022 Win32",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "Win32",
+      "binaryDir": "${sourceDir}/build/vs2022-win32"
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "vs2022-win32-debug",
+      "configurePreset": "vs2022-win32",
+      "configuration": "Debug"
+    },
+    {
+      "name": "vs2022-win32-release",
+      "configurePreset": "vs2022-win32",
+      "configuration": "Release"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "vs2022-win32-debug",
+      "configurePreset": "vs2022-win32",
+      "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

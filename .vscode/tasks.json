@@ -1,0 +1,55 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Test DiskUsage (VS 2022 x86)",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/d",
+				"/s",
+				"/c",
+				"(if not exist \"${workspaceFolder}\\.vscode\\build\" mkdir \"${workspaceFolder}\\.vscode\\build\") & set \"PATH=C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer;%PATH%\" && \"C:\\Program Files\\Microsoft Visual Studio\\2022\\Professional\\Common7\\Tools\\VsDevCmd.bat\" -arch=x86 -host_arch=x64 >nul && cl /nologo /EHsc /W3 /DWIN32 /D_WINDOWS /D_MBCS tests\\DiskUsage_test.cpp DiskUsage.cpp /Fo:\"${workspaceFolder}\\.vscode\\build\\\\\" /Fe:\"${workspaceFolder}\\.vscode\\build\\DiskUsage_test.exe\" && \"${workspaceFolder}\\.vscode\\build\\DiskUsage_test.exe\""
+			],
+			"group": "test",
+			"problemMatcher": "$msCompile",
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated"
+			}
+		},
+		{
+			"label": "Open SpaceMonger.dsw in Visual Studio",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/d",
+				"/s",
+				"/c",
+				"start \"\" \"C:\\Program Files\\Microsoft Visual Studio\\2022\\Professional\\Common7\\IDE\\devenv.exe\" \"${workspaceFolder}\\SpaceMonger.dsw\""
+			],
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "shared"
+			}
+		},
+		{
+			"label": "Build converted solution (Win32 Release)",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/d",
+				"/s",
+				"/c",
+				"if not exist \"${workspaceFolder}\\SpaceMonger.sln\" (echo SpaceMonger.sln not found. Run \"Open SpaceMonger.dsw in Visual Studio\" first and accept conversion. & exit /b 1) else (set \"PATH=C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer;%PATH%\" && \"C:\\Program Files\\Microsoft Visual Studio\\2022\\Professional\\Common7\\Tools\\VsDevCmd.bat\" -arch=x86 -host_arch=x64 >nul && msbuild \"${workspaceFolder}\\SpaceMonger.sln\" /p:Configuration=Release /p:Platform=Win32)"
+			],
+			"group": "build",
+			"problemMatcher": "$msCompile",
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated"
+			}
+		}
+	]
+}

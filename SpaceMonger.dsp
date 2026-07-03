@@ -101,6 +101,10 @@ SOURCE=.\DriveDialog.cpp
 # End Source File
 # Begin Source File
 
+SOURCE=.\DiskUsage.cpp
+# End Source File
+# Begin Source File
+
 SOURCE=.\FolderTree.cpp
 # End Source File
 # Begin Source File
@@ -159,6 +163,10 @@ SOURCE=.\AboutDialog.h
 # Begin Source File
 
 SOURCE=.\DriveDialog.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\DiskUsage.h
 # End Source File
 # Begin Source File
 
