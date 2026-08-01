@@ -2,6 +2,7 @@
 #include "stdafx.h"
 #include "SpaceMonger.h"
 #include "TipWnd.h"
+#include "TipWndText.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -305,13 +306,7 @@ static LRESULT CALLBACK TipWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 		return 0;
 
 	case WM_GETTEXT:
-		if (lParam != NULL) {
-			strncpy_s((char *)lParam, (int)wParam, info->text, _TRUNCATE);
-			((char *)lParam)[wParam-1] = '\0';
-			if ((int)wParam > (int)info->textlen) return (LRESULT)info->textlen;
-			else return (LRESULT)wParam;
-		}
-		return 0;
+		return (LRESULT)SM_CopyTipText((char *)lParam, (size_t)wParam, info->text);
 
 	case WM_GETTEXTLENGTH:
 		return (LRESULT)info->textlen;

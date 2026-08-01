@@ -129,3 +129,15 @@ set_target_properties(FolderSort_test PROPERTIES
   MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
 )
 add_test(NAME FolderSort_test COMMAND FolderSort_test)
+
+add_executable(TipWndText_test
+  tests/TipWndText_test.cpp
+  TipWndText.h
+)
+target_include_directories(TipWndText_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(TipWndText_test PRIVATE WIN32 _WINDOWS _MBCS)
+target_compile_options(TipWndText_test PRIVATE /W3 /EHsc)
+set_target_properties(TipWndText_test PROPERTIES
+  MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+)
+add_test(NAME TipWndText_test COMMAND TipWndText_test)

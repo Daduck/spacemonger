@@ -112,6 +112,7 @@ Between 1.4.1 and 1.4.2
    * Improved long-path support for the application manifest and shell file operations.
    * Fixed radix-sort bucket initialization and allocator size-overflow handling.
    * Raised the documented CMake baseline to match the current preset format.
+   * Hardened tooltip text retrieval for empty, null, and truncated buffers.
 
 Between 1.4.0 and 1.4.1 (Modernization Update)
    * Maintained and modernized by Johnny J. Andersen - Anderki.dk.
