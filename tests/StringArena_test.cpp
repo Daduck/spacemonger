@@ -43,9 +43,19 @@ static int large_allocations_do_not_break_followup_allocations()
 	return 1;
 }
 
+static int allocations_that_overflow_a_block_are_rejected()
+{
+	CStringArena arena;
+	size_t maxLength = ((size_t)-1) / sizeof(wchar_t);
+
+	CHECK(arena.Allocate(maxLength) == NULL);
+	return 1;
+}
+
 int main()
 {
 	if (!reset_allows_fresh_allocations()) return 1;
 	if (!large_allocations_do_not_break_followup_allocations()) return 1;
+	if (!allocations_that_overflow_a_block_are_rejected()) return 1;
 	return 0;
 }

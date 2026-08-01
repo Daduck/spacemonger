@@ -122,6 +122,16 @@ int test_prepare_built_wide_path_adds_long_path_prefix() {
 	return 1;
 }
 
+int test_prepare_long_path_preserves_long_components() {
+	std::wstring component(280, L'x');
+	std::wstring path = PathUtil::BuildWidePath("C:\\root", component, L"child.txt");
+	std::wstring prepared = PathUtil::PrepareLongPath(path);
+
+	CHECK(path.size() > MAX_PATH);
+	CHECK(prepared == L"\\\\?\\C:\\root\\" + component + L"\\child.txt");
+	return 1;
+}
+
 int main() {
 	if (!test_ansi_wide_conversion()) return 1;
 	if (!test_normalize_separators()) return 1;
@@ -134,6 +144,7 @@ int main() {
 	if (!test_append_component_adds_separator_when_needed()) return 1;
 	if (!test_build_wide_path_preserves_non_ascii_name()) return 1;
 	if (!test_prepare_built_wide_path_adds_long_path_prefix()) return 1;
+	if (!test_prepare_long_path_preserves_long_components()) return 1;
 	std::cout << "All PathUtil tests passed successfully!\n";
 	return 0;
 }

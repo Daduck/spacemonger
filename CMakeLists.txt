@@ -1,6 +1,6 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.25)
 
-project(SpaceMonger VERSION 1.4.0 LANGUAGES CXX RC)
+project(SpaceMonger VERSION 1.4.1 LANGUAGES CXX RC)
 
 if(NOT MSVC)
   message(FATAL_ERROR "SpaceMonger is a Win32 MFC application and currently requires MSVC.")
@@ -42,6 +42,7 @@ set(SPACEMONGER_SOURCES
   StdAfx.cpp
   TipWnd.cpp
   SpaceMonger.rc
+  SpaceMonger.manifest
 )
 
 add_executable(SpaceMonger WIN32 ${SPACEMONGER_SOURCES})
@@ -106,3 +107,25 @@ set_target_properties(FolderEntryArrays_test PROPERTIES
   MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
 )
 add_test(NAME FolderEntryArrays_test COMMAND FolderEntryArrays_test)
+
+add_executable(CommandPolicy_test
+  tests/CommandPolicy_test.cpp
+)
+target_include_directories(CommandPolicy_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(CommandPolicy_test PRIVATE WIN32 _WINDOWS _MBCS)
+target_compile_options(CommandPolicy_test PRIVATE /W3 /EHsc)
+set_target_properties(CommandPolicy_test PROPERTIES
+  MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+)
+add_test(NAME CommandPolicy_test COMMAND CommandPolicy_test)
+
+add_executable(FolderSort_test
+  tests/FolderSort_test.cpp
+)
+target_include_directories(FolderSort_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(FolderSort_test PRIVATE WIN32 _WINDOWS _MBCS)
+target_compile_options(FolderSort_test PRIVATE /W3 /EHsc)
+set_target_properties(FolderSort_test PROPERTIES
+  MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+)
+add_test(NAME FolderSort_test COMMAND FolderSort_test)

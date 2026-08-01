@@ -2,6 +2,7 @@
 #include "spacemonger.h"
 #include "FolderView.h"
 #include "MainFrm.h"
+#include "CommandPolicy.h"
 #include "TipWnd.h"
 #include "PathUtil.h"
 #include "Lang.h"
@@ -282,7 +283,8 @@ void CFolderView::OnLButtonDblClk(UINT flags, CPoint point)
 		else {
 			std::wstring title = BuildItemPathW(selected);
 			std::wstring path = BuildContainerPathW(selected);
-			ShellExecuteW(NULL, NULL, title.c_str(), NULL, path.c_str(), SW_SHOWDEFAULT);
+			if ((INT_PTR)ShellExecuteW(NULL, NULL, title.c_str(), NULL, path.c_str(), SW_SHOWDEFAULT) <= 32)
+				AfxMessageBox("Windows failed to open file.");
 		}
 	}
 	lastcur = NULL;
@@ -402,7 +404,7 @@ void CFolderView::SetupInfoTip(CDisplayFolder *cur)
 	if (theApp.m_settings.infotip_flags & TIP_ICON) {
 		SHFILEINFOW fileinfo;
 		memset(&fileinfo, 0, sizeof(SHFILEINFOW));
-		SHGetFileInfoW(preparedPath.c_str(), 0,
+		SHGetFileInfoW(widePath.c_str(), 0,
 			&fileinfo, sizeof(SHFILEINFOW), SHGFI_DISPLAYNAME|SHGFI_ICON);
 		m_infotipwnd.SetIcon(fileinfo.hIcon, 1);
 		m_infotipwnd.SetIconPos(TW_LEFT);
@@ -505,7 +507,7 @@ void CFolderView::OnRButtonUp(UINT flags, CPoint point)
 	::AddMenuEntry(menu);
 	::AddMenuEntry(menu, ID_FILE_RUN, CurLang->run, 0, cur == NULL, (cur != NULL) && (cur->flags & 1) == 0);
 	::AddMenuEntry(menu, ID_FILE_DELETE, CurLang->del, 0,
-		!app->m_settings.disable_delete && cur == NULL, 0);
+		!SM_CanDeleteSelection(app->m_settings.disable_delete, cur != NULL), 0);
 	::AddMenuEntry(menu);
 	::AddMenuEntry(menu, ID_FILE_OPEN, CurLang->opendrive, 0, 0, 0);
 	::AddMenuEntry(menu, ID_FILE_REFRESH, CurLang->rescandrive, 0, 0, 0);

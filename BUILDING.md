@@ -8,7 +8,7 @@ with the 32-bit MSVC toolchain.
 
 - Visual Studio 2022 with the C++ desktop tools
 - Visual Studio component: `C++ MFC for latest v143 build tools (x86 & x64)`
-- CMake 3.20 or newer
+- CMake 3.25 or newer
 
 If configure fails with `MFC headers were not found` or the compiler cannot find
 `afxwin.h`, install the MFC component from Visual Studio Installer and rerun the

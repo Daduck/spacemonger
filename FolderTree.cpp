@@ -4,6 +4,7 @@
 #include "FolderTree.h"
 #include "DiskUsage.h"
 #include "FolderEntryArrays.h"
+#include "FolderSort.h"
 #include "PathUtil.h"
 #include "Lang.h"
 #include <vector>
@@ -309,8 +310,7 @@ void CFolder::EightBitCountingSort(ui64 *dsize, ui64 *ssize, ui32 count, ui32 bi
 #define VALUE(size) (0xFF - (ui32)((size) >> bitpos) & 0xFF)
 
 	// Initially, zero offsets for each
-	for (i = 0; i < 256; i++)
-		countarray[i] = 0;
+	SM_InitRadixCountArray(countarray);
 
 	// Count how many of each value we have
 	for (i = 0; i < count; i++)

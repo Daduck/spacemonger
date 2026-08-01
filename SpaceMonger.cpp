@@ -9,7 +9,9 @@
 #include "SetupDlg.h"
 #include "TipWnd.h"
 #include "AboutDialog.h"
+#include "CommandPolicy.h"
 #include "PathUtil.h"
+#include <shobjidl.h>
 
 /////////////////////////////////////////////////////////////////////////////
 // The primary CSpaceMonger object
@@ -151,7 +153,53 @@ void CSpaceMonger::OnFileRun(void)
 	std::wstring title = fv->BuildItemPathW(fv->selected);
 	std::wstring path = fv->BuildContainerPathW(fv->selected);
 
-	ShellExecuteW(NULL, NULL, title.c_str(), NULL, path.c_str(), SW_SHOWDEFAULT);
+	if ((INT_PTR)ShellExecuteW(NULL, NULL, title.c_str(), NULL, path.c_str(), SW_SHOWDEFAULT) <= 32)
+		AfxMessageBox("Windows failed to open file.");
+}
+
+static HRESULT DeleteShellItem(const std::wstring& path, HWND owner)
+{
+	HRESULT initResult = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+	char uninitialize = initResult == S_OK || initResult == S_FALSE;
+	IShellItem *item = NULL;
+	IFileOperation *operation = NULL;
+	HRESULT result;
+
+	if (FAILED(initResult) && initResult != RPC_E_CHANGED_MODE)
+		return initResult;
+
+	result = SHCreateItemFromParsingName(path.c_str(), NULL, IID_PPV_ARGS(&item));
+	if (FAILED(result)) {
+		std::wstring preparedPath = PathUtil::PrepareLongPath(path);
+		if (preparedPath != path)
+			result = SHCreateItemFromParsingName(preparedPath.c_str(), NULL, IID_PPV_ARGS(&item));
+	}
+	if (SUCCEEDED(result))
+		result = CoCreateInstance(CLSID_FileOperation, NULL, CLSCTX_INPROC_SERVER,
+			IID_PPV_ARGS(&operation));
+	if (SUCCEEDED(result))
+		result = operation->SetOwnerWindow(owner);
+	if (SUCCEEDED(result))
+		result = operation->SetOperationFlags(
+			FOF_SILENT | FOF_NOCONFIRMATION | FOF_ALLOWUNDO | FOFX_RECYCLEONDELETE);
+	if (SUCCEEDED(result))
+		result = operation->DeleteItem(item, NULL);
+	if (SUCCEEDED(result))
+		result = operation->PerformOperations();
+	if (SUCCEEDED(result)) {
+		BOOL aborted = FALSE;
+		result = operation->GetAnyOperationsAborted(&aborted);
+		if (SUCCEEDED(result) && aborted)
+			result = E_ABORT;
+	}
+
+	if (operation != NULL)
+		operation->Release();
+	if (item != NULL)
+		item->Release();
+	if (uninitialize)
+		CoUninitialize();
+	return result;
 }
 
 void CSpaceMonger::OnFileDelete(void)
@@ -159,7 +207,8 @@ void CSpaceMonger::OnFileDelete(void)
 	CFolderView *fv = (CFolderView *)m_view;
 	CFolderTree *ft = (CFolderTree *)m_document;
 
-	if (fv == NULL || ft == NULL || fv->selected == NULL) return;
+	if (fv == NULL || ft == NULL ||
+		!SM_CanDeleteSelection(m_settings.disable_delete, fv->selected != NULL)) return;
 
 	std::wstring title = fv->BuildItemPathW(fv->selected);
 	BOOL isfolder;
@@ -167,23 +216,7 @@ void CSpaceMonger::OnFileDelete(void)
 		isfolder = 1;
 	else isfolder = 0;
 
-	std::wstring source = title;
-	source.push_back(L'\0');
-	source.push_back(L'\0');
-	std::wstring deleting = PathUtil::AnsiToWide(CurLang->deleting);
-
-	SHFILEOPSTRUCTW fop;
-	ZeroMemory(&fop, sizeof(fop));
-	fop.hwnd = m_mainframe->m_hWnd;
-	fop.wFunc = FO_DELETE;
-	fop.pFrom = source.c_str();
-	fop.pTo = NULL;
-	fop.fFlags = FOF_SIMPLEPROGRESS|FOF_ALLOWUNDO|FOF_NOCONFIRMATION;
-	fop.fAnyOperationsAborted = 0;
-	fop.hNameMappings = NULL;
-	fop.lpszProgressTitle = deleting.c_str();
-
-	if (SHFileOperationW(&fop) != 0 || fop.fAnyOperationsAborted) {
+	if (FAILED(DeleteShellItem(title, m_mainframe->m_hWnd))) {
 		AfxMessageBox("Windows failed to delete file.");
 		return;
 	}
@@ -265,7 +298,8 @@ void CSpaceMonger::OnFileProperties(void)
 	si.fMask  = SEE_MASK_INVOKEIDLIST;
 	si.lpVerb = L"properties";
 	si.lpFile = path.c_str();
-	ShellExecuteExW(&si);
+	if (!ShellExecuteExW(&si))
+		AfxMessageBox("Windows failed to show file properties.");
 }
 
 void CSpaceMonger::OnAbout()
@@ -286,7 +320,7 @@ void GeneralIgnoreUpdate(CCmdUI *ui)
 	int zoom = fv->zoomlevel;
 
 	if (ui->m_nID == ID_FILE_DELETE) {
-		if (theApp.m_settings.disable_delete || cur == NULL)
+		if (!SM_CanDeleteSelection(theApp.m_settings.disable_delete, cur != NULL))
 			ui->Enable(0);
 	}
 	else if (ui->m_nID == ID_FILE_RUN) {

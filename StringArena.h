@@ -41,16 +41,19 @@ public:
 	wchar_t *Allocate(size_t len)
 	{
 		const size_t defaultBlockSize = 65536;
+		const size_t maxSize = (size_t)-1;
 		size_t allocSize;
 		size_t blockSize;
 
-		if (len == 0 || len > ((size_t)-1) / sizeof(wchar_t))
+		if (len == 0 || len > maxSize / sizeof(wchar_t))
 			return NULL;
 
 		allocSize = len * sizeof(wchar_t);
 		blockSize = allocSize > defaultBlockSize ? allocSize : defaultBlockSize;
+		if (blockSize > maxSize - sizeof(CArenaBlock))
+			return NULL;
 
-		if (head == NULL || offset + allocSize > head->capacity) {
+		if (head == NULL || offset > head->capacity || allocSize > head->capacity - offset) {
 			CArenaBlock *block = (CArenaBlock *)malloc(sizeof(CArenaBlock) + blockSize);
 			if (block == NULL)
 				return NULL;
