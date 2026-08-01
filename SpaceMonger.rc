@@ -33,7 +33,7 @@ FONT 8, "MS Sans Serif"
 BEGIN
     DEFPUSHBUTTON   "",IDOK,94,134,50,14
     ICON            ID_SPACEMONGER,IDC_STATIC,7,9,20,20
-    LTEXT           "SpaceMonger Version 1.4.1",IDC_STATIC,37,9,95,10
+    LTEXT           "SpaceMonger Version 1.4.2",IDC_STATIC,37,9,95,10
     LTEXT           "Copyright (C) 1998, 1999, 2000 by Sean Werkema",
                     IDC_STATIC,37,18,168,8
     LTEXT           "Modernized in 2026 by Johnny J. Andersen - Anderki.dk",
@@ -277,8 +277,8 @@ IDR_TOOLBAR_FR          BITMAP  DISCARDABLE     "res\\toolbar_fr.bmp"
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,4,1,0
- PRODUCTVERSION 1,4,1,0
+ FILEVERSION 1,4,2,0
+ PRODUCTVERSION 1,4,2,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -296,14 +296,14 @@ BEGIN
             VALUE "Comments", "Visit http://www.werkema.com/software/spacemonger.html for the latest version\0"
             VALUE "CompanyName", "65 Systems\0"
             VALUE "FileDescription", "SpaceMonger Program File\0"
-            VALUE "FileVersion", "1, 4, 1, 0\0"
+            VALUE "FileVersion", "1, 4, 2, 0\0"
             VALUE "InternalName", "SpaceMonger\0"
             VALUE "LegalCopyright", "Copyright (C) 1997-2000 Sean Werkema\0"
             VALUE "LegalTrademarks", "\0"
             VALUE "OriginalFilename", "SpaceMonger.exe\0"
             VALUE "PrivateBuild", "\0"
             VALUE "ProductName", "SpaceMonger\0"
-            VALUE "ProductVersion", "1, 4, 1, 0\0"
+            VALUE "ProductVersion", "1, 4, 2, 0\0"
             VALUE "SpecialBuild", "\0"
         END
     END

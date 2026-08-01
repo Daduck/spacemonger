@@ -1,5 +1,5 @@
 
-SpaceMonger Version 1.4.1
+SpaceMonger Version 1.4.2
 -------------------------
 
 
@@ -19,7 +19,7 @@ The latest version of SpaceMonger is always available at its web page:
 SYSTEM REQUIREMENTS
 -------------------
 
-SpaceMonger 1.4.1 is optimized for modern Windows environments. It is intended
+SpaceMonger 1.4.2 is optimized for modern Windows environments. It is intended
 to run on Windows 10, Windows 11, and modern Windows Server editions.
 Because it is a native C++ MFC application, it has virtually zero dependencies
 and remains incredibly lightweight. Any PC capable of running Windows today
@@ -106,6 +106,12 @@ users of the program to give away copies to their friends.
 
 WHAT'S NEW
 ----------
+
+Between 1.4.1 and 1.4.2
+   * Fixed delete command enablement and added a defensive delete-policy guard.
+   * Improved long-path support for the application manifest and shell file operations.
+   * Fixed radix-sort bucket initialization and allocator size-overflow handling.
+   * Raised the documented CMake baseline to match the current preset format.
 
 Between 1.4.0 and 1.4.1 (Modernization Update)
    * Maintained and modernized by Johnny J. Andersen - Anderki.dk.
