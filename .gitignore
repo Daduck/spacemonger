@@ -5,3 +5,5 @@ Debug/
 Release/
 *.ncb
 *.opt
+.memdb/
+.memtrace/
