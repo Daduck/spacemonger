@@ -25,3 +25,11 @@ jobs:
 
     - name: Test
       run: ctest --preset vs2022-win32-${{ matrix.configuration == 'Debug' && 'debug' || 'release' }}
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-${{ matrix.configuration }}
+        path: |
+          build/vs2022-win32/**/*.exe
+          build/vs2022-win32/**/*.dll
