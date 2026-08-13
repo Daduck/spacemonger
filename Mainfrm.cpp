@@ -20,6 +20,7 @@ BEGIN_MESSAGE_MAP(CMainFrame, CFrameWnd)
 	ON_WM_CLOSE()
 	ON_WM_WINDOWPOSCHANGED()
 	ON_WM_SHOWWINDOW()
+	ON_MESSAGE(0x02E0, OnDpiChanged)
 	//}}AFX_MSG_MAP
 	ON_UPDATE_COMMAND_UI_RANGE(100, 41000, OnIgnoreUpdate)
 END_MESSAGE_MAP()
@@ -36,6 +37,7 @@ BOOL CMainFrame::PreCreateWindow(CREATESTRUCT& cs)
 {
 	CFrameWnd::PreCreateWindow(cs);
 
+	cs.style &= ~FWS_ADDTOTITLE;
 	cs.dwExStyle &= ~WS_EX_CLIENTEDGE;
 
 	return(1);
@@ -44,6 +46,8 @@ BOOL CMainFrame::PreCreateWindow(CREATESTRUCT& cs)
 int CMainFrame::OnCreate(LPCREATESTRUCT lpCreateStruct)
 {
 	if (CFrameWnd::OnCreate(lpCreateStruct) == -1) return(-1);
+
+	SetWindowText("SpaceMonger");
 
 	HINSTANCE hinst = AfxFindResourceHandle(MAKEINTRESOURCE(ID_SPACEMONGER), RT_ICON);
 	HICON hicon = ::LoadIcon(hinst, MAKEINTRESOURCE(ID_SPACEMONGER));
@@ -212,6 +216,21 @@ void CMainFrame::OnShowWindow(BOOL bShow, UINT status)
 	theApp.m_settings.showcmd = w.showCmd;
 }
 
+LRESULT CMainFrame::OnDpiChanged(WPARAM wParam, LPARAM lParam)
+{
+	RECT* prc = (RECT*)lParam;
+	if (prc != NULL) {
+		SetWindowPos(NULL, prc->left, prc->top, prc->right - prc->left, prc->bottom - prc->top,
+			SWP_NOZORDER | SWP_NOACTIVATE);
+	}
+	RecalcLayout(0);
+	if (theApp.m_view != NULL) {
+		((CFolderView*)theApp.m_view)->RecreateFonts();
+		theApp.m_view->Invalidate();
+	}
+	return 0;
+}
+
 /////////////////////////////////////////////////////////////////////////////
 
 IMPLEMENT_DYNCREATE(CMainToolBar, CToolBar)
@@ -251,22 +270,29 @@ void CMainToolBar::EnableState(int state, BOOL enabled)
 	}
 }
 
+static inline void SetButtonEnabledIfChanged(CToolBarCtrl &ctrl, int id, BOOL enable)
+{
+	if ((ctrl.IsButtonEnabled(id) != 0) != (enable != 0)) {
+		ctrl.EnableButton(id, enable);
+	}
+}
+
 void CMainToolBar::UpdateButtonsForView(CFolderView *view)
 {
 	CSpaceMonger *app = (CSpaceMonger *)AfxGetApp();
 	CToolBarCtrl &ctrl = this->GetToolBarCtrl();
-	ctrl.EnableButton(ID_FILE_RUN, view->IsAnythingOpen() && view->IsAnythingSelected());
-	ctrl.EnableButton(ID_FILE_DELETE, !app->m_settings.disable_delete
+	SetButtonEnabledIfChanged(ctrl, ID_FILE_RUN, view->IsAnythingOpen() && view->IsAnythingSelected());
+	SetButtonEnabledIfChanged(ctrl, ID_FILE_DELETE, !app->m_settings.disable_delete
 		&& view->IsAnythingOpen() && view->IsAnythingSelected());
-	ctrl.EnableButton(ID_FILE_OPEN, 1);
-	ctrl.EnableButton(ID_FILE_REFRESH, view->IsAnythingOpen());
-	ctrl.EnableButton(ID_VIEW_ZOOM_FULL, view->IsAnythingOpen() && !view->IsZoomFull());
-	ctrl.EnableButton(ID_VIEW_ZOOM_OUT, view->IsAnythingOpen() && !view->IsZoomFull());
-	ctrl.EnableButton(ID_VIEW_ZOOM_IN, view->IsAnythingOpen() && view->IsAnythingSelected()
+	SetButtonEnabledIfChanged(ctrl, ID_FILE_OPEN, 1);
+	SetButtonEnabledIfChanged(ctrl, ID_FILE_REFRESH, view->IsAnythingOpen());
+	SetButtonEnabledIfChanged(ctrl, ID_VIEW_ZOOM_FULL, view->IsAnythingOpen() && !view->IsZoomFull());
+	SetButtonEnabledIfChanged(ctrl, ID_VIEW_ZOOM_OUT, view->IsAnythingOpen() && !view->IsZoomFull());
+	SetButtonEnabledIfChanged(ctrl, ID_VIEW_ZOOM_IN, view->IsAnythingOpen() && view->IsAnythingSelected()
 		&& view->IsSelectedAFolder());
-	ctrl.EnableButton(ID_VIEW_FREE, view->IsAnythingOpen());
-	ctrl.EnableButton(ID_SETTINGS, 1);
-	ctrl.EnableButton(ID_APP_ABOUT, 1);
+	SetButtonEnabledIfChanged(ctrl, ID_VIEW_FREE, view->IsAnythingOpen());
+	SetButtonEnabledIfChanged(ctrl, ID_SETTINGS, 1);
+	SetButtonEnabledIfChanged(ctrl, ID_APP_ABOUT, 1);
 }
 
 void CMainToolBar::OnIgnoreUpdate(CCmdUI *ui)

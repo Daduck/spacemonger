@@ -3,10 +3,24 @@
   "configurePresets": [
     {
       "name": "vs2022-win32",
-      "displayName": "Visual Studio 2022 Win32",
+      "displayName": "Visual Studio 2022 Win32 (x86)",
       "generator": "Visual Studio 17 2022",
       "architecture": "Win32",
       "binaryDir": "${sourceDir}/build/vs2022-win32"
+    },
+    {
+      "name": "vs2022-x64",
+      "displayName": "Visual Studio 2022 x64",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build/vs2022-x64"
+    },
+    {
+      "name": "vs2022-arm64",
+      "displayName": "Visual Studio 2022 ARM64",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "ARM64",
+      "binaryDir": "${sourceDir}/build/vs2022-arm64"
     }
   ],
   "buildPresets": [
@@ -18,6 +32,26 @@
     {
       "name": "vs2022-win32-release",
       "configurePreset": "vs2022-win32",
+      "configuration": "Release"
+    },
+    {
+      "name": "vs2022-x64-debug",
+      "configurePreset": "vs2022-x64",
+      "configuration": "Debug"
+    },
+    {
+      "name": "vs2022-x64-release",
+      "configurePreset": "vs2022-x64",
+      "configuration": "Release"
+    },
+    {
+      "name": "vs2022-arm64-debug",
+      "configurePreset": "vs2022-arm64",
+      "configuration": "Debug"
+    },
+    {
+      "name": "vs2022-arm64-release",
+      "configurePreset": "vs2022-arm64",
       "configuration": "Release"
     }
   ],
@@ -33,6 +67,22 @@
     {
       "name": "vs2022-win32-release",
       "configurePreset": "vs2022-win32",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "vs2022-x64-debug",
+      "configurePreset": "vs2022-x64",
+      "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "vs2022-x64-release",
+      "configurePreset": "vs2022-x64",
       "configuration": "Release",
       "output": {
         "outputOnFailure": true

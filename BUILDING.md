@@ -1,58 +1,53 @@
 # Building SpaceMonger
 
-SpaceMonger is an old Win32 MFC application. The original Visual C++ 6
-workspace files are still present, but the supported modern build path is CMake
-with the 32-bit MSVC toolchain.
+SpaceMonger is built using CMake and the Visual Studio 2022 MSVC toolchain, supporting native 32-bit (x86), 64-bit (x64), and ARM64 Windows targets.
 
 ## Prerequisites
 
 - Visual Studio 2022 with the C++ desktop tools
-- Visual Studio component: `C++ MFC for latest v143 build tools (x86 & x64)`
+- Visual Studio component: `C++ MFC for latest v143 build tools (x86 & x64)` (and optionally ARM64/ARM64EC for ARM64 builds)
 - CMake 3.25 or newer
 
-If configure fails with `MFC headers were not found` or the compiler cannot find
-`afxwin.h`, install the MFC component from Visual Studio Installer and rerun the
-configure command.
+If configure fails with `MFC headers were not found` or the compiler cannot find `afxwin.h`, install the MFC component from Visual Studio Installer and rerun the configure command.
 
 ## Command Line
 
+### 64-bit (x64) — Recommended
+
+```powershell
+cmake --preset vs2022-x64
+cmake --build --preset vs2022-x64-debug
+ctest --preset vs2022-x64-debug
+
+# Optimized Release build:
+cmake --build --preset vs2022-x64-release
+ctest --preset vs2022-x64-release
+```
+The generated executable is written under `build/vs2022-x64/Release/SpaceMonger.exe`.
+
+### 32-bit (Win32 / x86)
+
 ```powershell
 cmake --preset vs2022-win32
-cmake --build --preset vs2022-win32-debug
-ctest --preset vs2022-win32-debug
+cmake --build --preset vs2022-win32-release
+ctest --preset vs2022-win32-release
 ```
+The generated executable is written under `build/vs2022-win32/Release/SpaceMonger.exe`.
 
-For an optimized build:
+### ARM64 (Windows on ARM)
 
 ```powershell
-cmake --build --preset vs2022-win32-release
+cmake --preset vs2022-arm64
+cmake --build --preset vs2022-arm64-release
 ```
-
-The generated executable is written under `build/vs2022-win32/<Config>/`.
+The generated executable is written under `build/vs2022-arm64/Release/SpaceMonger.exe`.
 
 ## Visual Studio
 
-Open `build/vs2022-win32/SpaceMonger.sln` after running:
+Open the generated solution `build/vs2022-x64/SpaceMonger.sln` or `build/vs2022-win32/SpaceMonger.sln` after configuring with CMake.
 
-```powershell
-cmake --preset vs2022-win32
-```
-
-Do not open `legacy/SpaceMonger.dsw` in modern Visual Studio as the primary workflow;
-it is the historical Visual C++ 6 workspace.
+Do not open `legacy/SpaceMonger.dsw` in modern Visual Studio as the primary workflow; it is the historical Visual C++ 6 workspace.
 
 ## VS Code
 
-Open the folder and use the CMake Tools extension with the
-`vs2022-win32` preset, or run the command-line steps from the integrated
-terminal.
-
-The checked-in VS Code tasks mirror the CMake commands:
-
-- `CMake: configure VS 2022 Win32`
-- `CMake: build Debug`
-- `CMake: build Release`
-- `CMake: test Debug`
-
-The C/C++ extension configuration delegates IntelliSense setup to CMake Tools
-so local MSVC and Windows SDK paths do not need to be committed.
+Open the folder and select your desired CMake configure preset (`vs2022-x64`, `vs2022-win32`, or `vs2022-arm64`) using the CMake Tools extension, or run the command-line presets from the integrated terminal.

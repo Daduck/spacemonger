@@ -47,6 +47,7 @@ protected:
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
 	afx_msg void OnWindowPosChanged(WINDOWPOS *wp);
 	afx_msg void OnShowWindow(BOOL bShow, UINT status);
+	afx_msg LRESULT OnDpiChanged(WPARAM wParam, LPARAM lParam);
 	//}}AFX_MSG
 	afx_msg void OnIgnoreUpdate(CCmdUI *ui);
 	DECLARE_MESSAGE_MAP()

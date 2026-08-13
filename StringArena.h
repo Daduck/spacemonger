@@ -38,6 +38,26 @@ public:
 		FreeBlocks();
 	}
 
+	void Merge(CStringArena& other)
+	{
+		if (other.head == NULL) return;
+
+		CArenaBlock *tail = other.head;
+		while (tail->next != NULL) {
+			tail = tail->next;
+		}
+
+		tail->next = head;
+		head = other.head;
+		// The adopted head block already contains the other arena's strings and
+		// its fill level is unknown here, so seal it: the next Allocate must
+		// start a fresh block instead of overwriting live data.
+		offset = head->capacity;
+
+		other.head = NULL;
+		other.offset = 0;
+	}
+
 	wchar_t *Allocate(size_t len)
 	{
 		const size_t defaultBlockSize = 65536;

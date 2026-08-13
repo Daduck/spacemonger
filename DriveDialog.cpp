@@ -96,13 +96,32 @@ BOOL CDriveDialog::OnInitDialog()
 
 //////////////////////////////////////////////////////////////////////////////
 
+CDriveInfo::CDriveInfo()
+	: letter(0), avail(FALSE), icon(NULL), longname(NULL)
+{
+}
+
+CDriveInfo::~CDriveInfo()
+{
+	Free();
+}
+
 void CDriveInfo::Free(void)
 {
-	if (longname != NULL) delete[] longname;
+	if (longname != NULL) {
+		delete[] longname;
+		longname = NULL;
+	}
+	if (icon != NULL) {
+		DestroyIcon(icon);
+		icon = NULL;
+	}
 }
 
 void CDriveInfo::LoadDriveInfo(char let)
 {
+	Free();
+
 	char name[8];
 	UINT type;
 

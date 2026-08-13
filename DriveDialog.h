@@ -3,6 +3,8 @@
 #define DRIVEDIALOG_H
 
 struct CDriveInfo {
+	CDriveInfo();
+	~CDriveInfo();
 	void Free(void);
 	void LoadDriveInfo(char letter);
 

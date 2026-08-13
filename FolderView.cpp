@@ -108,8 +108,51 @@ BEGIN_MESSAGE_MAP(CFolderView, CFreeView)
 	ON_UPDATE_COMMAND_UI_RANGE(100, 41000, OnIgnoreUpdate)
 END_MESSAGE_MAP()
 
+static UINT GetWindowDpi(HWND hwnd)
+{
+	typedef UINT (WINAPI *GetDpiForWindowProc)(HWND);
+	HMODULE hUser32 = GetModuleHandleA("user32.dll");
+	if (hUser32 != NULL) {
+		GetDpiForWindowProc pGetDpiForWindow = (GetDpiForWindowProc)GetProcAddress(hUser32, "GetDpiForWindow");
+		if (pGetDpiForWindow != NULL && hwnd != NULL) {
+			UINT dpi = pGetDpiForWindow(hwnd);
+			if (dpi != 0) return dpi;
+		}
+	}
+	HDC hdc = ::GetDC(hwnd);
+	UINT dpi = 96;
+	if (hdc != NULL) {
+		dpi = ::GetDeviceCaps(hdc, LOGPIXELSY);
+		::ReleaseDC(hwnd, hdc);
+	}
+	return (dpi != 0) ? dpi : 96;
+}
+
+void CFolderView::RecreateFonts(void)
+{
+	if (minifont.m_hObject != NULL) minifont.DeleteObject();
+
+	minifont.CreateFont(-9, 0, 0, 0, FW_NORMAL, 0, 0, 0, ANSI_CHARSET,
+		OUT_RASTER_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
+		VARIABLE_PITCH|FF_SWISS, "Small Fonts");
+
+	if (::IsWindow(m_nametipwnd.m_hWnd)) {
+		HFONT nametipfont = ::CreateFont(-9, 0, 0, 0, FW_NORMAL, 0, 0, 0, ANSI_CHARSET,
+			OUT_RASTER_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
+			VARIABLE_PITCH|FF_SWISS, "Small Fonts");
+		::SendMessage(m_nametipwnd.m_hWnd, WM_SETFONT, (WPARAM)nametipfont, TRUE);
+	}
+}
+
 BOOL CFolderView::OnWndMsg(UINT message, WPARAM wParam, LPARAM lParam, LRESULT *pResult)
 {
+	if (message == 0x02E0 /* WM_DPICHANGED */) {
+		RecreateFonts();
+		Invalidate();
+		if (pResult != NULL) *pResult = 0;
+		return TRUE;
+	}
+
 	if (::IsWindow(m_infotipwnd.m_hWnd)) {
 		MSG msg;
 		msg.message = message;
@@ -152,19 +195,13 @@ int CFolderView::OnCreate(LPCREATESTRUCT lpCreateStruct)
 	black.CreateSolidBrush(RGB(0x00, 0x00, 0x00));
 	white.CreateSolidBrush(RGB(0xFF, 0xFF, 0xFF));
 
-	minifont.CreateFont(-9, 0, 0, 0, FW_NORMAL, 0, 0, 0, ANSI_CHARSET,
-		OUT_RASTER_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
-		VARIABLE_PITCH|FF_SWISS, "Small Fonts");
+	RecreateFonts();
 
 	m_infotipwnd.SetAutoShow(1);
 	m_infotipwnd.SetAutoPos(1);
 	m_infotipwnd.SetShowDelay(theApp.m_settings.infotip_delay);
 	m_infotipwnd.EnableWindow(0);
 
-	HFONT nametipfont = ::CreateFont(-9, 0, 0, 0, FW_NORMAL, 0, 0, 0, ANSI_CHARSET,
-		OUT_RASTER_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
-		VARIABLE_PITCH|FF_SWISS, "Small Fonts");
-	::SendMessage(m_nametipwnd.m_hWnd, WM_SETFONT, (WPARAM)nametipfont, 0);
 	m_nametipwnd.SetAutoShow(1);
 	m_nametipwnd.SetShowDelay(theApp.m_settings.nametip_delay);
 	m_nametipwnd.SetVPadding(0);
@@ -268,112 +305,109 @@ void CFolderView::HighlightPathAtPoint(const CPoint &point)
 
 void CFolderView::OnLButtonDown(UINT flags, CPoint point)
 {
-	SelectFolder(GetDisplayFolderFromPoint(point));
-	lastcur = NULL;
-	OnMouseMove(flags, point);
+	CDisplayFolder *cur = GetDisplayFolderFromPoint(point);
+	SelectFolder(cur);
 }
 
 void CFolderView::OnLButtonDblClk(UINT flags, CPoint point)
 {
 	CDisplayFolder *cur = GetDisplayFolderFromPoint(point);
-	SelectFolder(cur);
-
 	if (cur != NULL) {
-		if (cur->flags & 1) ZoomIn(cur);
+		if (cur->flags & 1)
+			ZoomIn(cur);
 		else {
-			std::wstring title = BuildItemPathW(selected);
-			std::wstring path = BuildContainerPathW(selected);
-			if ((INT_PTR)ShellExecuteW(NULL, NULL, title.c_str(), NULL, path.c_str(), SW_SHOWDEFAULT) <= 32)
-				AfxMessageBox("Windows failed to open file.");
+			CSpaceMonger *app = (CSpaceMonger *)AfxGetApp();
+			app->OnFileRun();
 		}
 	}
-	lastcur = NULL;
-	OnMouseMove(flags, point);
 }
 
 void CFolderView::OnMouseMove(UINT nFlags, CPoint point)
 {
+	if (nFlags != 0) return;
+
 	CDisplayFolder *cur = GetDisplayFolderFromPoint(point);
 
-	if (theApp.m_settings.rollover_box) HighlightPathAtPoint(point);
-	else HighlightPathAtPoint(CPoint(-1,-1));
-
-	if (theApp.m_settings.show_info_tips) {
-		if (cur == NULL)
-			m_infotipwnd.EnableWindow(0);
-		else if (lastcur != cur)
+	if (cur != lastcur) {
+		HighlightPathAtPoint(point);
+		if (theApp.m_settings.show_info_tips)
 			SetupInfoTip(cur);
-	}
-	else m_infotipwnd.EnableWindow(0);
-
-	if (theApp.m_settings.show_name_tips) {
-		if (cur == NULL)
-			m_nametipwnd.EnableWindow(0);
-		else if (lastcur != cur)
+		if (theApp.m_settings.show_name_tips)
 			SetupNameTip(cur);
+		lastcur = cur;
 	}
-	else m_nametipwnd.EnableWindow(0);
-
-	lastcur = cur;
 }
 
 static void PrintFileSize(CString &string, ui64 size)
 {
-	char sizebuf[256];
-	char *dest = sizebuf+255;
-	int ctr = 0;
-	sizebuf[255] = '\0';
-	while (size != 0) {
-		if (++ctr == 4) *--dest = CurLang->digitcomma, ctr = 1;
-		*--dest = (char)(size % 10) + '0';
-		size /= 10;
+	CString sizestring;
+	ui32 displayfull, displayfractional;
+	const char *displaytype;
+
+	if (size < (ui64)(1024)) {
+		displayfull = (ui32)size;
+		displayfractional = 0;
+		displaytype = CurLang->bytes;
 	}
-	string += dest;
-	string += " ";
-	string += CurLang->bytes;
+	else if (size < (ui64)(1024*1024)) {
+		displayfull = (ui32)(size / (ui64)(1024));
+		displayfractional = (ui32)(10 * (size % (ui64)(1024)) / (ui64)(1024));
+		displaytype = CurLang->kb;
+	}
+	else if (size < (ui64)(1024*1024*1024)) {
+		displayfull = (ui32)(size / (ui64)(1024*1024));
+		displayfractional = (ui32)(10 * (size % (ui64)(1024*1024)) / (ui64)(1024*1024));
+		displaytype = CurLang->mb;
+	}
+	else {
+		displayfull = (ui32)(size / (ui64)(1024*1024*1024));
+		displayfractional = (ui32)(10 * (size % (ui64)(1024*1024*1024)) / (ui64)(1024*1024*1024));
+		displaytype = CurLang->gb;
+	}
+	sizestring.Format(CurLang->size_format, displayfull, displayfractional, displaytype);
+	string += sizestring;
 }
 
-static void PrintDate(CString &string, ui64 date)
+static void PrintDate(CString &string, ui64 time)
 {
-	CString tempstring;
-	SYSTEMTIME mtime;
-	FileTimeToSystemTime((FILETIME *)&date, &mtime);
-	if (mtime.wMonth < 1 || mtime.wMonth > 12) mtime.wMonth = 1;
-	if (mtime.wDayOfWeek < 0 || mtime.wDayOfWeek > 6) mtime.wDayOfWeek = 0;
-	tempstring.Format("%02d %s %04d   %d:%02d:%02d",
-		mtime.wDay, CurLang->monthnames[mtime.wMonth-1], mtime.wYear,
-		mtime.wHour, mtime.wMinute, mtime.wSecond);
-	string += tempstring;
+	if (time == 0) return;
+
+	FILETIME ft;
+	ft.dwLowDateTime = (DWORD)time;
+	ft.dwHighDateTime = (DWORD)(time >> 32);
+
+	FILETIME lft;
+	FileTimeToLocalFileTime(&ft, &lft);
+
+	SYSTEMTIME st;
+	FileTimeToSystemTime(&lft, &st);
+
+	char date[64], timebuf[64];
+	GetDateFormatA(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, sizeof(date));
+	GetTimeFormatA(LOCALE_USER_DEFAULT, TIME_NOSECONDS, &st, NULL, timebuf, sizeof(timebuf));
+
+	string += date;
+	string += " ";
+	string += timebuf;
 }
 
 void CFolderView::SetupInfoTip(CDisplayFolder *cur)
 {
-	if (cur == NULL) {
-		m_infotipwnd.EnableWindow(0);
-		return;
-	}
+	m_infotipwnd.EnableWindow(0);
 
+	if (cur == NULL || cur->name == NULL || cur->name[0] == '<')
+		return;
+
+	std::wstring widePath = BuildItemPathW(cur);
+	std::string path = PathUtil::WideToAnsi(BuildContainerPathW(cur));
 	CString string;
 
-	// Get the full pathname to the file.
-	CFolderTree *ft = (CFolderTree *)GetDocument();
-	std::wstring wideRelativePath;
-	BuildTitleReverseW(cur->source, wideRelativePath);
-	std::wstring widePath = PathUtil::BuildWidePath(ft->m_path, wideRelativePath, cur->source->names[cur->index]);
-	CString path = PathUtil::WideToAnsi(PathUtil::BuildWidePath(ft->m_path, wideRelativePath, NULL)).c_str();
-
-	// Load in the file's information using FindFirstFile.
-	WIN32_FIND_DATAW info;
+	WIN32_FILE_ATTRIBUTE_DATA info;
 	memset(&info, 0, sizeof(info));
-	std::wstring preparedPath = PathUtil::PrepareLongPath(widePath);
-	HANDLE handle = FindFirstFileW(preparedPath.c_str(), &info);
-	if (handle != INVALID_HANDLE_VALUE)
-		FindClose(handle);
-
-
+	GetFileAttributesExW(widePath.c_str(), GetFileExInfoStandard, &info);
 
 	if (theApp.m_settings.infotip_flags & TIP_PATH)
-		string += path;
+		string += path.c_str();
 	if (theApp.m_settings.infotip_flags & TIP_NAME)
 		string += PathUtil::WideToAnsi(cur->source->names[cur->index]).c_str();
 	if (theApp.m_settings.infotip_flags & (TIP_NAME|TIP_PATH))
@@ -584,28 +618,29 @@ static CString GetSizeString(ui64 size, ui64 totalspace, BOOL percent)
 void CFolderView::UpdateTitleBar(void)
 {
 	CMainFrame *mainfrm = (CMainFrame *)GetTopLevelFrame();
-	CFolderTree *ft = (CFolderTree *)GetDocument();
-	CString title = "";
-	ui64 size;
+	if (mainfrm == NULL) return;
 
 	mainfrm->m_toolbar.UpdateButtonsForView(this);
 
-	if (mainfrm == NULL) return;
-	if (ft == NULL) {
-		mainfrm->SetWindowText(title);
+	CFolderTree *ft = (CFolderTree *)GetDocument();
+	if (ft == NULL || rootfolder == NULL) {
+		mainfrm->SetWindowText("SpaceMonger");
 		return;
 	}
 
+	CString title = "";
+	ui64 size;
+
 	if (selected != NULL && selected->name != NULL) {
-		if (ft != NULL) title += ft->m_path;
+		title += ft->m_path;
 		BuildTitleReverse(selected->source, title);
 		title += PathUtil::WideToAnsi(selected->source->names[selected->index]).c_str();
 		size = selected->source->sizes[selected->index];
 		title += "  -  " + GetSizeString(size, ft->totalspace, 1)
 			+ "  -  " + GetSizeString(size, ft->totalspace, 0) + "  -  ";
 	}
-	else if (rootfolder != NULL && ft != NULL) {
-		if (ft != NULL) title += ft->m_path;
+	else if (rootfolder != NULL) {
+		title += ft->m_path;
 		BuildTitleReverse(rootfolder, title);
 		if (rootfolder->parent == NULL) size = ft->totalspace; // Kludge
 		else size = rootfolder->SizeTotal();
@@ -938,8 +973,9 @@ void CFolderView::BuildFolderLayout(int x, int y, int w, int h, CFolder *folder,
 		{ 16, 12, },
 		{ 8, 6, },
 	};
-	hmin = minsizes[theApp.m_settings.density + 3][0];
-	vmin = minsizes[theApp.m_settings.density + 3][1];
+	UINT dpi = GetWindowDpi(m_hWnd);
+	hmin = MulDiv(minsizes[theApp.m_settings.density + 3][0], (int)dpi, 96);
+	vmin = MulDiv(minsizes[theApp.m_settings.density + 3][1], (int)dpi, 96);
 
 	int *scratch = new (std::nothrow) int[folder->cur];
 	if (scratch != NULL) {
@@ -1178,4 +1214,3 @@ void CFolderView::OnIgnoreUpdate(CCmdUI *ui)
 {
 	GeneralIgnoreUpdate(ui);
 }
-

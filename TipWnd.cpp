@@ -127,7 +127,7 @@ static void DrawMultilineText(HDC dc, TipWndInfo *info, POINT *point)
 
 static LRESULT CALLBACK TipWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-	TipWndInfo *info = (TipWndInfo *)::GetWindowLong(hwnd, GWL_USERDATA);
+	TipWndInfo *info = (TipWndInfo *)::GetWindowLongPtr(hwnd, GWLP_USERDATA);
 	if (info == NULL && uMsg != WM_CREATE)
 		return ::DefWindowProc(hwnd, uMsg, wParam, lParam);
 
@@ -154,7 +154,7 @@ static LRESULT CALLBACK TipWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 		info->hidden = 0;
 		info->enabled = 1;
 		info->ourmousex = info->ourmousey = -32768;
-		::SetWindowLong(hwnd, GWL_USERDATA, (LONG)info);
+		::SetWindowLongPtr(hwnd, GWLP_USERDATA, (LONG_PTR)info);
 		return 0;
 
 	case WM_DESTROY:
@@ -666,7 +666,7 @@ HWND WINAPI ::CreateTipWnd(HWND owner, const RECT *rect, BOOL showwnd)
 	HWND hwnd = ::CreateWindowEx(WS_EX_TOPMOST, CLASSNAME, "", WS_POPUP,
 		rect->left, rect->top, rect->right-rect->left, rect->bottom-rect->top,
 		owner, NULL, theInst, NULL);
-	TipWndInfo *info = (TipWndInfo *)::GetWindowLong(hwnd, GWL_USERDATA);
+	TipWndInfo *info = (TipWndInfo *)::GetWindowLongPtr(hwnd, GWLP_USERDATA);
 	if (info != NULL) info->owner = owner;
 	return hwnd;
 }
@@ -717,7 +717,7 @@ BOOL CTipWnd::Create(CWnd *owner, const RECT &rect, BOOL showwnd)
 	CWnd *pWnd = this;
 	if (!pWnd->CreateEx(WS_EX_TOPMOST, _T(CLASSNAME), _T(""), WS_POPUP, rect, owner, 0, NULL))
 		return 0;
-	TipWndInfo *info = (TipWndInfo *)::GetWindowLong(m_hWnd, GWL_USERDATA);
+	TipWndInfo *info = (TipWndInfo *)::GetWindowLongPtr(m_hWnd, GWLP_USERDATA);
 	if (info != NULL) info->owner = owner->m_hWnd;
 
 	if (showwnd) {

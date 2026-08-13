@@ -43,6 +43,7 @@ public:
 		{ return zoomlevel == 0; }
 
 	void UpdateTitleBar(void);
+	void RecreateFonts(void);
 
 	void SelectFolder(CDisplayFolder *cur);
 	void BuildTitleReverseW(CFolder *folder, std::wstring& string);

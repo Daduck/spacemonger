@@ -11,17 +11,20 @@ jobs:
     runs-on: windows-2022
 
     strategy:
+      fail-fast: false
       matrix:
+        preset: [vs2022-win32, vs2022-x64, vs2022-arm64]
         configuration: [Debug, Release]
 
     steps:
     - uses: actions/checkout@v4
 
     - name: Configure CMake
-      run: cmake --preset vs2022-win32
+      run: cmake --preset ${{ matrix.preset }}
 
     - name: Build
-      run: cmake --build --preset vs2022-win32-${{ matrix.configuration == 'Debug' && 'debug' || 'release' }}
+      run: cmake --build --preset ${{ matrix.preset }}-${{ matrix.configuration == 'Debug' && 'debug' || 'release' }}
 
-    - name: Test
-      run: ctest --preset vs2022-win32-${{ matrix.configuration == 'Debug' && 'debug' || 'release' }}
+    - name: Test (x86 / x64)
+      if: matrix.preset != 'vs2022-arm64'
+      run: ctest --preset ${{ matrix.preset }}-${{ matrix.configuration == 'Debug' && 'debug' || 'release' }}

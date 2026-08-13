@@ -33,6 +33,8 @@ BEGIN_MESSAGE_MAP(CSpaceMonger, CWinApp)
 	ON_COMMAND(ID_VIEW_ZOOM_FULL, OnZoomFull)
 	ON_COMMAND(ID_VIEW_ZOOM_IN, OnZoomIn)
 	ON_COMMAND(ID_VIEW_ZOOM_OUT, OnZoomOut)
+
+
 	ON_COMMAND(ID_VIEW_FREE, OnShowFree)
 	ON_COMMAND(ID_SETTINGS, OnSettings)
 	//}}AFX_MSG_MAP
@@ -50,6 +52,11 @@ CSpaceMonger::~CSpaceMonger()
 
 BOOL CSpaceMonger::InitInstance()
 {
+	INITCOMMONCONTROLSEX icex;
+	icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
+	icex.dwICC = ICC_WIN95_CLASSES | ICC_PROGRESS_CLASS | ICC_LISTVIEW_CLASSES;
+	InitCommonControlsEx(&icex);
+
 	int i;
 
 	InitTipWnd(AfxGetInstanceHandle());
@@ -94,6 +101,7 @@ BOOL CSpaceMonger::InitInstance()
 			MAKEINTRESOURCE(anim_name[i]), IMAGE_BITMAP, 128, 48,
 			LR_LOADTRANSPARENT|LR_LOADMAP3DCOLORS);
 
+	m_mainframe->SetWindowText("SpaceMonger");
 	m_mainframe->ShowWindow(showcmd);
 	m_mainframe->UpdateWindow();
 	m_mainframe->RecalcLayout();
