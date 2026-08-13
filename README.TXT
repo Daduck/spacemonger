@@ -1,5 +1,5 @@
 
-SpaceMonger Version 1.4.2
+SpaceMonger Version 1.4.3
 -------------------------
 
 
@@ -19,7 +19,7 @@ The latest version of SpaceMonger is always available at its web page:
 SYSTEM REQUIREMENTS
 -------------------
 
-SpaceMonger 1.4.2 is optimized for modern Windows environments. It is intended
+SpaceMonger 1.4.3 is optimized for modern Windows environments. It is intended
 to run on Windows 10, Windows 11, and modern Windows Server editions.
 Because it is a native C++ MFC application, it has virtually zero dependencies
 and remains incredibly lightweight. Any PC capable of running Windows today
@@ -106,6 +106,27 @@ users of the program to give away copies to their friends.
 
 WHAT'S NEW
 ----------
+
+Between 1.4.2 and 1.4.3 (Multithreaded Scanner)
+   * New multithreaded scan engine that spreads directory scanning across
+     CPU cores, dramatically speeding up scans of large drives.
+   * Fixed an intermittent race condition that could make a scan hang
+     forever just as it finished.
+   * Fixed cloud-placeholder folders (OneDrive, Dropbox, Google Drive)
+     being silently omitted from scan results; symbolic links and
+     junctions are still correctly excluded.
+   * Fixed a memory bug that could corrupt a file or folder name shown
+     in the treemap after a completed scan.
+   * Cancelling a scan is now immediate, even on unresponsive network
+     drives, and the window stays responsive while the scan shuts down.
+   * Scans now abort cleanly when the system runs out of memory instead
+     of silently dropping folders from the results.
+   * Reduced scanner memory overhead on drives with many small folders.
+   * Added Per-Monitor V2 DPI awareness, so the app renders sharply on
+     high-DPI and mixed-DPI monitor setups.
+   * Scan progress dialog now displays UNC network paths correctly.
+   * Declared Windows compatibility (7 through 11) in the manifest and
+     fixed toolbar button flicker during scans.
 
 Between 1.4.1 and 1.4.2
    * Fixed delete command enablement and added a defensive delete-policy guard.

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(SpaceMonger VERSION 1.4.2 LANGUAGES CXX RC)
+project(SpaceMonger VERSION 1.4.3 LANGUAGES CXX RC)
 
 if(NOT MSVC)
   message(FATAL_ERROR "SpaceMonger is a Win32 MFC application and currently requires MSVC.")
