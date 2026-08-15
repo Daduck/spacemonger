@@ -352,6 +352,102 @@ static int test_extreme_bias_and_density_filtering()
 	return 1;
 }
 
+// Regression test: sub-threshold regions must emit visible, correctly placed
+// placeholder blocks. A placeholder once rendered invisibly (depth -1 draws
+// flat gray with no outline), which left dense folders looking empty, and an
+// earlier copy-paste bug placed list1's placeholder in list2's rectangle.
+static int test_subthreshold_placeholder_depth_and_bounds()
+{
+	CStringArena arena;
+	CFolder root;
+	wchar_t name[16];
+	for (int i = 0; i < 32; i++) {
+		swprintf(name, 16, L"f%02d.bin", i);
+		root.AddFileWithArena(arena, name, (ui32)wcslen(name), 10, 10, 0);
+	}
+	root.Finalize();
+
+	// 40x30 exceeds the default minimum box (32x24 at 96 DPI), but each half
+	// of the first split (20x30) falls below it, so both halves must become
+	// placeholder blocks.
+	std::vector<TreemapNode> nodes;
+	TreemapConfig config;
+	TreemapEngine::ComputeLayout(0, 0, 40, 30, &root, 0, config, nodes);
+
+	CHECK(nodes.size() == 2);
+	for (const auto &n : nodes) {
+		// Placeholder identity: no name, no source index.
+		CHECK(n.name == nullptr);
+		CHECK(n.index == (ui32)-1);
+		// Must carry the parent depth so it renders as a depth-colored
+		// block, never -1 (which renders as invisible flat gray).
+		CHECK(n.depth == 0);
+		// Must lie within the region being subdivided.
+		CHECK(n.x >= 0 && n.y >= 0);
+		CHECK(n.x + n.w <= 40);
+		CHECK(n.y + n.h <= 30);
+		CHECK(n.w > 0 && n.h > 0);
+	}
+	// The two placeholders must tile the region, not overlap.
+	CHECK(nodes[0].x + nodes[0].w <= nodes[1].x || nodes[1].x + nodes[1].w <= nodes[0].x
+		|| nodes[0].y + nodes[0].h <= nodes[1].y || nodes[1].y + nodes[1].h <= nodes[0].y);
+
+	return 1;
+}
+
+// Regression test: the layout must not depend on the order entries were
+// added. Live-scan trees arrive unsorted (insertion order), while finalized
+// trees are sorted by size; the engine sorts internally so both must produce
+// identical geometry for identical content.
+static int test_unsorted_input_matches_finalized_layout()
+{
+	static const ui64 SIZES[] = { 800, 700, 600, 500, 400, 300, 200, 100 };
+	static const int COUNT = 8;
+	wchar_t name[16];
+
+	CStringArena arenaA;
+	CFolder sorted;
+	for (int i = 0; i < COUNT; i++) {
+		swprintf(name, 16, L"s%llu.bin", SIZES[i]);
+		sorted.AddFileWithArena(arenaA, name, (ui32)wcslen(name), SIZES[i], SIZES[i], 0);
+	}
+	sorted.Finalize();
+
+	CStringArena arenaB;
+	CFolder unsorted;
+	for (int i = COUNT - 1; i >= 0; i--) {
+		swprintf(name, 16, L"s%llu.bin", SIZES[i]);
+		unsorted.AddFileWithArena(arenaB, name, (ui32)wcslen(name), SIZES[i], SIZES[i], 0);
+	}
+	// Deliberately NOT finalized: entries stay in ascending insertion order,
+	// like a live scan tree.
+
+	std::vector<TreemapNode> nodesSorted, nodesUnsorted;
+	TreemapConfig config;
+	TreemapEngine::ComputeLayout(0, 0, 1200, 900, &sorted, 0, config, nodesSorted);
+	TreemapEngine::ComputeLayout(0, 0, 1200, 900, &unsorted, 0, config, nodesUnsorted);
+
+	CHECK(nodesSorted.size() == (size_t)COUNT);
+	CHECK(nodesUnsorted.size() == (size_t)COUNT);
+
+	// Every file must land at the same rectangle in both layouts.
+	for (const auto &a : nodesSorted) {
+		CHECK(a.name != nullptr);
+		bool found = false;
+		for (const auto &b : nodesUnsorted) {
+			if (b.name != nullptr && wcscmp(a.name, b.name) == 0) {
+				CHECK(a.x == b.x && a.y == b.y && a.w == b.w && a.h == b.h);
+				CHECK(a.depth == b.depth);
+				found = true;
+				break;
+			}
+		}
+		CHECK(found);
+	}
+
+	return 1;
+}
+
 int main()
 {
 	if (!test_null_and_empty_folder()) return 1;
@@ -365,6 +461,8 @@ int main()
 	if (!test_multi_level_nesting()) return 1;
 	if (!test_multi_file_greedy_partition()) return 1;
 	if (!test_extreme_bias_and_density_filtering()) return 1;
+	if (!test_subthreshold_placeholder_depth_and_bounds()) return 1;
+	if (!test_unsorted_input_matches_finalized_layout()) return 1;
 
 	printf("Treemap_test passed successfully.\n");
 	return 0;

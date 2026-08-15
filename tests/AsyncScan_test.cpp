@@ -463,6 +463,73 @@ static int test_live_layout_during_active_multilevel_scan()
 	return 1;
 }
 
+// Regression test: live layout snapshots must be fully self-contained. Nodes
+// once pointed into the engine's tree and string arenas (and a stack-local
+// pseudo-root), which left dangling pointers after the engine died - e.g. on
+// a cancelled scan. Every name must live in the caller's storage, and the
+// snapshot must stay readable after the engine is destroyed.
+static int test_live_layout_survives_engine_destruction()
+{
+	std::wstring tempDir = CreateTempTestDirectory();
+	CreateDummyFile(tempDir + L"\\bigfile.dat", 50000);
+	std::wstring sub = tempDir + L"\\SubFolder";
+	CreateDirectoryW(sub.c_str(), NULL);
+	CreateDummyFile(sub + L"\\nested.dat", 30000);
+
+	std::vector<TreemapNode> nodes;
+	std::vector<std::wstring> names;
+
+	{
+		AsyncScanEngine engine;
+		std::wstring preparedPath = PathUtil::PrepareLongPath(tempDir);
+		preparedPath = PathUtil::EnsureTrailingBackslash(preparedPath);
+
+		CHECK(engine.StartScan(preparedPath, 0, false, 2));
+		engine.WaitForCompletion();
+		CHECK(!engine.IsCancelled());
+
+		TreemapConfig config;
+		engine.GenerateLiveLayout(1024, 768, 200000, 50000, config, nodes, names);
+		CHECK(!nodes.empty());
+
+		// Every named node must point into the caller-owned storage, never
+		// into engine-owned memory.
+		for (const auto& n : nodes) {
+			CHECK(n.source == nullptr);
+			CHECK(n.index == (ui32)-1);
+			if (n.name != nullptr) {
+				bool ownedByStorage = false;
+				for (const auto& s : names) {
+					if (n.name == s.c_str()) { ownedByStorage = true; break; }
+				}
+				CHECK(ownedByStorage);
+			}
+		}
+
+		CStringArena targetArena;
+		CFolder* root = engine.DetachResult(targetArena);
+		CHECK(root != NULL);
+		delete root;
+	}
+	// Engine, its arenas, and the detached tree are gone; the snapshot must
+	// still be fully usable.
+
+	bool foundBigFile = false;
+	bool foundSubFolder = false;
+	for (const auto& n : nodes) {
+		if (n.name != nullptr) {
+			CHECK(wcslen(n.name) > 0);
+			if (wcscmp(n.name, L"bigfile.dat") == 0) foundBigFile = true;
+			if (wcscmp(n.name, L"SubFolder") == 0) foundSubFolder = true;
+		}
+	}
+	CHECK(foundBigFile);
+	CHECK(foundSubFolder);
+
+	DeleteTestDirectory(tempDir);
+	return 1;
+}
+
 int main()
 {
 	if (!test_async_scan_directory_tree()) return 1;
@@ -473,6 +540,7 @@ int main()
 	if (!test_concurrent_live_layout()) return 1;
 	if (!test_live_layout_nested_folders()) return 1;
 	if (!test_live_layout_during_active_multilevel_scan()) return 1;
+	if (!test_live_layout_survives_engine_destruction()) return 1;
 	printf("AsyncScan_test passed successfully.\n");
 	return 0;
 }
