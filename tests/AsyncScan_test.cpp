@@ -294,6 +294,167 @@ static int test_concurrent_live_layout()
 	return 1;
 }
 
+static int test_live_layout_nested_folders()
+{
+	std::wstring tempDir = CreateTempTestDirectory();
+
+	// Structure:
+	// tempDir/
+	//   rootfile.txt (20,000 bytes)
+	//   FolderA/
+	//     FolderB/
+	//       deepfile.txt (50,000 bytes)
+	//   FolderC/
+	//     file2.txt (30,000 bytes)
+
+	CreateDummyFile(tempDir + L"\\rootfile.txt", 20000);
+
+	std::wstring folderA = tempDir + L"\\FolderA";
+	CreateDirectoryW(folderA.c_str(), NULL);
+	std::wstring folderB = folderA + L"\\FolderB";
+	CreateDirectoryW(folderB.c_str(), NULL);
+	CreateDummyFile(folderB + L"\\deepfile.txt", 50000);
+
+	std::wstring folderC = tempDir + L"\\FolderC";
+	CreateDirectoryW(folderC.c_str(), NULL);
+	CreateDummyFile(folderC + L"\\file2.txt", 30000);
+
+	AsyncScanEngine engine;
+	std::wstring preparedPath = PathUtil::PrepareLongPath(tempDir);
+	preparedPath = PathUtil::EnsureTrailingBackslash(preparedPath);
+
+	CHECK(engine.StartScan(preparedPath, 0, false, 2));
+	engine.WaitForCompletion();
+	CHECK(!engine.IsCancelled());
+
+	TreemapConfig config;
+	std::vector<TreemapNode> nodes;
+	engine.GenerateLiveLayout(1000, 800, 200000, 50000, config, nodes);
+
+	CHECK(!nodes.empty());
+
+	bool foundFolderA = false;
+	bool foundFolderB = false;
+	bool foundDeepFile = false;
+	bool foundFolderC = false;
+	bool foundRootFile = false;
+	bool foundScanning = false;
+	bool foundFreeSpace = false;
+
+	for (const auto& n : nodes) {
+		CHECK(n.name != nullptr);
+		if (wcscmp(n.name, L"FolderA") == 0) {
+			foundFolderA = true;
+			CHECK(n.IsFolder());
+			CHECK(n.depth == 0);
+		}
+		if (wcscmp(n.name, L"FolderB") == 0) {
+			foundFolderB = true;
+			CHECK(n.IsFolder());
+			CHECK(n.depth == 1);
+		}
+		if (wcscmp(n.name, L"deepfile.txt") == 0) {
+			foundDeepFile = true;
+			CHECK(!n.IsFolder());
+			CHECK(n.depth == 2);
+		}
+		if (wcscmp(n.name, L"FolderC") == 0) {
+			foundFolderC = true;
+			CHECK(n.IsFolder());
+		}
+		if (wcscmp(n.name, L"rootfile.txt") == 0) {
+			foundRootFile = true;
+			CHECK(!n.IsFolder());
+		}
+		if (wcscmp(n.name, L"<Scanning...>") == 0) {
+			foundScanning = true;
+			CHECK(n.IsSpecial());
+		}
+		if (wcscmp(n.name, L"<Free Space>") == 0) {
+			foundFreeSpace = true;
+			CHECK(n.IsSpecial());
+		}
+	}
+
+	CHECK(foundFolderA);
+	CHECK(foundFolderB);
+	CHECK(foundDeepFile);
+	CHECK(foundFolderC);
+	CHECK(foundRootFile);
+	CHECK(foundScanning);
+	CHECK(foundFreeSpace);
+
+	CStringArena targetArena;
+	CFolder* root = engine.DetachResult(targetArena);
+	CHECK(root != NULL);
+	delete root;
+
+	DeleteTestDirectory(tempDir);
+	return 1;
+}
+
+static int test_live_layout_during_active_multilevel_scan()
+{
+	std::wstring tempDir = CreateTempTestDirectory();
+
+	// Create 30 top-level directories, each with a subfolder and files
+	for (int i = 0; i < 30; ++i) {
+		std::wstring sub1 = tempDir + L"\\TopDir" + std::to_wstring(i);
+		CreateDirectoryW(sub1.c_str(), NULL);
+		CreateDummyFile(sub1 + L"\\rootfile.txt", 1000);
+
+		std::wstring sub2 = sub1 + L"\\SubDir" + std::to_wstring(i);
+		CreateDirectoryW(sub2.c_str(), NULL);
+		for (int j = 0; j < 3; ++j) {
+			CreateDummyFile(sub2 + L"\\file" + std::to_wstring(j) + L".txt", 2000);
+		}
+	}
+
+	AsyncScanEngine engine;
+	std::wstring preparedPath = PathUtil::PrepareLongPath(tempDir);
+	preparedPath = PathUtil::EnsureTrailingBackslash(preparedPath);
+
+	CHECK(engine.StartScan(preparedPath, 0, false, 4));
+
+	TreemapConfig config;
+	std::vector<TreemapNode> nodes;
+	bool observedNestedFolderDuringScan = false;
+	bool observedChildFileDuringScan = false;
+
+	while (engine.IsScanning()) {
+		engine.GenerateLiveLayout(1024, 768, 1000000, 200000, config, nodes);
+		for (const auto& n : nodes) {
+			if (n.IsFolder() && n.depth >= 1) {
+				observedNestedFolderDuringScan = true;
+			}
+			if (!n.IsFolder() && n.depth >= 1) {
+				observedChildFileDuringScan = true;
+			}
+		}
+		Sleep(5);
+	}
+
+	engine.WaitForCompletion();
+	CHECK(!engine.IsCancelled());
+
+	// Must have observed nested folders and files during or immediately upon scan
+	engine.GenerateLiveLayout(1024, 768, 1000000, 200000, config, nodes);
+	for (const auto& n : nodes) {
+		if (n.IsFolder() && n.depth >= 1) observedNestedFolderDuringScan = true;
+		if (!n.IsFolder() && n.depth >= 1) observedChildFileDuringScan = true;
+	}
+	CHECK(observedNestedFolderDuringScan);
+	CHECK(observedChildFileDuringScan);
+
+	CStringArena targetArena;
+	CFolder* root = engine.DetachResult(targetArena);
+	CHECK(root != NULL);
+	delete root;
+
+	DeleteTestDirectory(tempDir);
+	return 1;
+}
+
 int main()
 {
 	if (!test_async_scan_directory_tree()) return 1;
@@ -302,6 +463,8 @@ int main()
 	if (!test_async_scan_repeated_shutdown_stress()) return 1;
 	if (!test_async_scan_is_scanning_loop_termination()) return 1;
 	if (!test_concurrent_live_layout()) return 1;
+	if (!test_live_layout_nested_folders()) return 1;
+	if (!test_live_layout_during_active_multilevel_scan()) return 1;
 	printf("AsyncScan_test passed successfully.\n");
 	return 0;
 }

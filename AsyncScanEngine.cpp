@@ -372,6 +372,23 @@ CFolder* AsyncScanEngine::DetachResult(CStringArena& targetArena)
 	return result;
 }
 
+static ui64 ComputeLiveSizes(CFolder* folder)
+{
+	if (folder == nullptr) return 0;
+
+	ui64 total_children = 0;
+	for (unsigned int i = 0; i < folder->cur; ++i) {
+		if (folder->children[i] != nullptr) {
+			ui64 childSize = ComputeLiveSizes(folder->children[i]);
+			folder->sizes[i] = childSize;
+			folder->actualsizes[i] = childSize;
+			total_children += childSize;
+		}
+	}
+	folder->size_children = total_children;
+	return folder->size_self + total_children;
+}
+
 void AsyncScanEngine::GenerateLiveLayout(
 	int w, int h,
 	ui64 totalDiskSpace,
@@ -385,11 +402,12 @@ void AsyncScanEngine::GenerateLiveLayout(
 	std::lock_guard<std::mutex> lock(m_treeMutex);
 	if (m_rootFolder == nullptr || m_cancelled.load()) return;
 
+	ui64 scannedBytes = ComputeLiveSizes(m_rootFolder);
+
 	unsigned int rootCount = m_rootFolder->cur;
 	if (rootCount == 0 && totalDiskSpace == 0) return;
 
 	// Calculate scanned and remaining bytes
-	ui64 scannedBytes = m_bytesScanned.load(std::memory_order_relaxed);
 	ui64 remainingBytes = 0;
 	if (totalDiskSpace > freeDiskSpace + scannedBytes) {
 		remainingBytes = totalDiskSpace - freeDiskSpace - scannedBytes;
@@ -424,13 +442,8 @@ void AsyncScanEngine::GenerateLiveLayout(
 	for (unsigned int i = 0; i < rootCount; ++i) {
 		liveRoot.names[liveRoot.cur] = m_rootFolder->names[i];
 		liveRoot.children[liveRoot.cur] = m_rootFolder->children[i];
-		if (m_rootFolder->children[i] != nullptr) {
-			liveRoot.sizes[liveRoot.cur] = m_rootFolder->children[i]->SizeTotal();
-			liveRoot.actualsizes[liveRoot.cur] = m_rootFolder->children[i]->SizeTotal();
-		} else {
-			liveRoot.sizes[liveRoot.cur] = m_rootFolder->sizes[i];
-			liveRoot.actualsizes[liveRoot.cur] = m_rootFolder->actualsizes[i];
-		}
+		liveRoot.sizes[liveRoot.cur] = m_rootFolder->sizes[i];
+		liveRoot.actualsizes[liveRoot.cur] = m_rootFolder->actualsizes[i];
 		liveRoot.times[liveRoot.cur] = m_rootFolder->times[i];
 		liveRoot.cur++;
 	}
