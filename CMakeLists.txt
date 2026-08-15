@@ -39,6 +39,7 @@ set(SPACEMONGER_SOURCES
   SpaceMonger.cpp
   StdAfx.cpp
   TipWnd.cpp
+  TreemapLayout.cpp
   SpaceMonger.rc
   SpaceMonger.manifest
 )
@@ -51,6 +52,7 @@ target_precompile_headers(SpaceMonger PRIVATE Stdafx.h)
 set_source_files_properties(PathUtil.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 set_source_files_properties(AsyncScanEngine.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 set_source_files_properties(Folder.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+set_source_files_properties(TreemapLayout.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 set_target_properties(SpaceMonger PROPERTIES
   MFC_FLAG 1
   MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
@@ -162,3 +164,25 @@ set_target_properties(AsyncScan_test PROPERTIES
   MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
 )
 add_test(NAME AsyncScan_test COMMAND AsyncScan_test)
+
+add_executable(Treemap_test
+  tests/Treemap_test.cpp
+  TreemapLayout.cpp
+  TreemapLayout.h
+  Folder.cpp
+  Folder.h
+  FolderEntryArrays.cpp
+  FolderEntryArrays.h
+  PathUtil.cpp
+  PathUtil.h
+  DiskUsage.cpp
+  DiskUsage.h
+)
+target_include_directories(Treemap_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(Treemap_test PRIVATE WIN32 _WINDOWS _MBCS)
+target_compile_options(Treemap_test PRIVATE /W3 /EHsc)
+set_target_properties(Treemap_test PROPERTIES
+  MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+)
+add_test(NAME Treemap_test COMMAND Treemap_test)
+
