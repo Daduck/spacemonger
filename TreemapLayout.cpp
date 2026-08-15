@@ -147,7 +147,9 @@ static void SizeFolders(
 					folder->children[index[0]], depth + 1, config, hmin, vmin, outNodes);
 			}
 		} else {
-			AddNode(outNodes, folder, (ui32)-1, -1, (si16)x1, (si16)y1, (si16)w1, (si16)h1, TREEMAP_FLAG_NONE);
+			// Sub-threshold region: emit a depth-colored placeholder block so
+			// dense folders keep the classic "filled" texture.
+			AddNode(outNodes, folder, (ui32)-1, depth, (si16)x1, (si16)y1, (si16)w1, (si16)h1, TREEMAP_FLAG_NONE);
 		}
 	}
 
@@ -164,7 +166,7 @@ static void SizeFolders(
 					folder->children[index[numlist1]], depth + 1, config, hmin, vmin, outNodes);
 			}
 		} else {
-			AddNode(outNodes, folder, (ui32)-1, -1, (si16)x2, (si16)y2, (si16)w2, (si16)h2, TREEMAP_FLAG_NONE);
+			AddNode(outNodes, folder, (ui32)-1, depth, (si16)x2, (si16)y2, (si16)w2, (si16)h2, TREEMAP_FLAG_NONE);
 		}
 	}
 }
