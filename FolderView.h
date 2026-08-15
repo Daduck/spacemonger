@@ -74,7 +74,6 @@ public:
 	virtual void OnUpdate(CFreeDoc *doc);
 
 protected:
-	void DrawDisplayFolder(CDC *pDC, const TreemapNode *cur, BOOL selected);
 	void MinimalDrawDisplayFolder(CDC *pDC, const TreemapNode *cur, BOOL selected);
 	void AnimateBox(const CRect &start, const CRect &end);
 	void SetupInfoTip(const TreemapNode *cur);

@@ -238,29 +238,31 @@ const TreemapNode *CFolderView::GetContainerDisplayFolderFromPoint(const CPoint 
 
 void CFolderView::HighlightPathAtPoint(const CPoint &point)
 {
-	CDC *pDC = GetDC();
-	pDC->SelectObject(&minifont);
-	pDC->SetBkMode(TRANSPARENT);
-	pDC->SetTextAlign(TA_LEFT | TA_TOP | TA_NOUPDATECP);
-	pDC->SelectPalette(&m_palette, 0);
+	BOOL changed = FALSE;
+
 	for (auto &cur : m_layoutNodes) {
 		if (cur.name != NULL && cur.name[0] != '<') {
-			if (point.x > cur.x && point.y > cur.y
-				&& point.x < cur.x + cur.w && point.y < cur.y + cur.h) {
-				if (!(cur.flags & TREEMAP_FLAG_HOVER)) {
-					cur.flags |= TREEMAP_FLAG_HOVER;
-					MinimalDrawDisplayFolder(pDC, &cur, selected == &cur);
-				}
+			BOOL inside = point.x > cur.x && point.y > cur.y
+				&& point.x < cur.x + cur.w && point.y < cur.y + cur.h;
+			if (inside && !(cur.flags & TREEMAP_FLAG_HOVER)) {
+				cur.flags |= TREEMAP_FLAG_HOVER;
+				changed = TRUE;
 			}
-			else {
-				if (cur.flags & TREEMAP_FLAG_HOVER) {
-					cur.flags &= ~TREEMAP_FLAG_HOVER;
-					MinimalDrawDisplayFolder(pDC, &cur, selected == &cur);
-				}
+			else if (!inside && (cur.flags & TREEMAP_FLAG_HOVER)) {
+				cur.flags &= ~TREEMAP_FLAG_HOVER;
+				changed = TRUE;
 			}
 		}
 	}
-	ReleaseDC(pDC);
+
+	// Nodes can't be redrawn in isolation: a folder's minimal draw clears its
+	// interior, erasing every descendant already on screen. Repaint through
+	// the double-buffered OnPaint instead. Hover only changes pixels when
+	// rollover boxes are enabled, so skip the repaint otherwise.
+	if (changed && theApp.m_settings.rollover_box) {
+		InvalidateRect(NULL, FALSE);
+		UpdateWindow();
+	}
 }
 
 void CFolderView::OnLButtonDown(UINT flags, CPoint point)
@@ -423,7 +425,7 @@ void CFolderView::SetupNameTip(const TreemapNode *cur)
 	pDC->SelectPalette(&m_palette, 0);
 
 	int tx, ty, failed = 0;
-	int len = wcslen(cur->name);
+	int len = (int)wcslen(cur->name);
 	CSize size;
 	::GetTextExtentPoint32W(pDC->GetSafeHdc(), cur->name, len, &size);
 	int x = cur->x, y = cur->y, w = cur->w + 1, h = cur->h + 1;
@@ -476,7 +478,7 @@ static void AddMenuEntry(HMENU menu, UINT cmd = 0, const char *string = NULL,
 	mii.hbmpChecked = NULL;
 	mii.hbmpUnchecked = NULL;
 	mii.dwTypeData = (char *)string;
-	if (string != NULL) mii.cch = strlen(string);
+	if (string != NULL) mii.cch = (UINT)strlen(string);
 	else mii.cch = 0;
 
 	::InsertMenuItem(menu, GetMenuItemCount(menu), TRUE, &mii);
@@ -520,18 +522,11 @@ void CFolderView::SelectFolder(const TreemapNode *cur)
 {
 	if (cur == selected) return;
 
-	CDC *dc = GetDC();
-
-	if (selected != NULL) {
-		DrawDisplayFolder(dc, selected, 0);
-		selected = NULL;
-	}
-
 	selected = cur;
-	if (selected != NULL)
-		DrawDisplayFolder(dc, selected, 1);
 
-	ReleaseDC(dc);
+	// See HighlightPathAtPoint: nodes can't be redrawn in isolation.
+	InvalidateRect(NULL, FALSE);
+	UpdateWindow();
 	UpdateTitleBar();
 }
 
@@ -677,16 +672,6 @@ void CFolderView::OnDraw(CDC *pDC)
 	}
 }
 
-void CFolderView::DrawDisplayFolder(CDC *pDC, const TreemapNode *cur, BOOL sel)
-{
-	pDC->SelectObject(&minifont);
-	pDC->SetBkMode(TRANSPARENT);
-	pDC->SetTextAlign(TA_LEFT | TA_TOP | TA_NOUPDATECP);
-	pDC->SelectPalette(&m_palette, 0);
-
-	MinimalDrawDisplayFolder(pDC, cur, sel);
-}
-
 void CFolderView::MinimalDrawDisplayFolder(CDC *pDC, const TreemapNode *cur, BOOL sel)
 {
 	int x, y, w, h;
@@ -747,7 +732,7 @@ void CFolderView::MinimalDrawDisplayFolder(CDC *pDC, const TreemapNode *cur, BOO
 		rgn.CreateRectRgn(x, y, x + w, y + h);
 		pDC->SelectClipRgn(&rgn);
 
-		int len = wcslen(cur->name);
+		int len = (int)wcslen(cur->name);
 		CSize size;
 		int tx, ty;
 
