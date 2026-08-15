@@ -27,7 +27,7 @@ struct TipWndInfo {
 	unsigned char autoshow;
 	unsigned char autopos;
 	short int showdelay;
-	UINT timer, hidetimer;
+	UINT_PTR timer, hidetimer;
 	HWND owner;
 	int mousex, mousey;
 	BOOL hidden;
@@ -89,7 +89,7 @@ static void ComputeTextExtents(HDC dc, TipWndInfo *info, SIZE *size)
 			end = start;
 			while (*end != '\0' && *end != '\n') end++;
 			linesize.cx = linesize.cy = 0;
-			::GetTextExtentPoint32(dc, start, end-start, &linesize);
+			::GetTextExtentPoint32(dc, start, (int)(end-start), &linesize);
 			height += tm.tmAscent + tm.tmDescent;
 			if (linesize.cx > maxlen) maxlen = linesize.cx;
 			if (*end == '\n') end++;
@@ -117,7 +117,7 @@ static void DrawMultilineText(HDC dc, TipWndInfo *info, POINT *point)
 			end = start;
 			while (*end != '\0' && *end != '\n') end++;
 			linesize.cx = linesize.cy = 0;
-			::TextOut(dc, point->x, point->y, start, end-start);
+			::TextOut(dc, point->x, point->y, start, (int)(end-start));
 			point->y += tm.tmAscent + tm.tmDescent;
 			if (*end == '\n') end++;
 			start = end;
@@ -295,7 +295,7 @@ static LRESULT CALLBACK TipWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 			if (!strcmp(info->text, (const char *)lParam)) return 0;
 			free(info->text);
 		}
-		info->textlen = strlen((const char *)lParam);
+		info->textlen = (int)strlen((const char *)lParam);
 		info->text = (char *)malloc(info->textlen+1);
 		if (info->text) {
 			strcpy_s(info->text, info->textlen+1, (const char *)lParam);
@@ -407,7 +407,7 @@ static LRESULT CALLBACK TipWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 
 		case TW_SET_BGCOLOR:
 			if (lParam != (LPARAM)info->bgcolor) {
-				info->bgcolor = lParam;
+				info->bgcolor = (COLORREF)lParam;
 				::RedrawWindow(hwnd, NULL, NULL, RDW_ERASE|RDW_INTERNALPAINT);
 			}
 			return 0;
@@ -417,7 +417,7 @@ static LRESULT CALLBACK TipWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 
 		case TW_SET_TEXTCOLOR:
 			if (lParam != (LPARAM)info->textcolor) {
-				info->textcolor = lParam;
+				info->textcolor = (COLORREF)lParam;
 				::RedrawWindow(hwnd, NULL, NULL, RDW_ERASE|RDW_INTERNALPAINT);
 			}
 			return 0;
@@ -427,7 +427,7 @@ static LRESULT CALLBACK TipWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 
 		case TW_SET_BORDERCOLOR:
 			if (lParam != (LPARAM)info->bordercolor) {
-				info->bordercolor = lParam;
+				info->bordercolor = (COLORREF)lParam;
 				::RedrawWindow(hwnd, NULL, NULL, RDW_ERASE|RDW_INTERNALPAINT);
 			}
 			return 0;

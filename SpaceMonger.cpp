@@ -128,7 +128,7 @@ void CSpaceMonger::OnAppExit(void)
 void CSpaceMonger::OnFileOpen(void)
 {
 	CDriveDialog drvdialog;
-	int drive = drvdialog.DoModal();
+	int drive = (int)drvdialog.DoModal();
 	if (drive == -1) return;
 
 	CFolderTree *ft = (CFolderTree *)m_document;

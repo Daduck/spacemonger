@@ -155,23 +155,23 @@ public:
 	inline void SetAnchor(int anchor)
 		{ SendMessage(WM_COMMAND, TW_SET_ANCHOR, (LPARAM)anchor); }
 	inline int GetAnchor(void)
-		{ return SendMessage(WM_COMMAND, TW_GET_ANCHOR); }
+		{ return (int)SendMessage(WM_COMMAND, TW_GET_ANCHOR); }
 	inline void SetIconPos(int iconpos)
 		{ SendMessage(WM_COMMAND, TW_SET_ICONPOS, (LPARAM)iconpos); }
 	inline int GetIconPos(void)
-		{ return SendMessage(WM_COMMAND, TW_GET_ICONPOS); }
+		{ return (int)SendMessage(WM_COMMAND, TW_GET_ICONPOS); }
 	inline void SetBgColor(COLORREF color)
 		{ SendMessage(WM_COMMAND, TW_SET_BGCOLOR, (LPARAM)color); }
 	inline int GetBgColor(void)
-		{ return SendMessage(WM_COMMAND, TW_GET_BGCOLOR); }
+		{ return (int)SendMessage(WM_COMMAND, TW_GET_BGCOLOR); }
 	inline void SetTextColor(COLORREF color)
 		{ SendMessage(WM_COMMAND, TW_SET_TEXTCOLOR, (LPARAM)color); }
 	inline int GetTextColor(void)
-		{ return SendMessage(WM_COMMAND, TW_GET_TEXTCOLOR); }
+		{ return (int)SendMessage(WM_COMMAND, TW_GET_TEXTCOLOR); }
 	inline void SetBorderColor(COLORREF color)
 		{ SendMessage(WM_COMMAND, TW_SET_BORDERCOLOR, (LPARAM)color); }
 	inline int GetBorderColor(void)
-		{ return SendMessage(WM_COMMAND, TW_GET_BORDERCOLOR); }
+		{ return (int)SendMessage(WM_COMMAND, TW_GET_BORDERCOLOR); }
 	inline void SetAutoShow(BOOL bEnable)
 		{ SendMessage(WM_COMMAND, TW_SET_AUTOSHOW, (LPARAM)bEnable); }
 	inline BOOL GetAutoShow(void)
@@ -179,21 +179,21 @@ public:
 	inline void SetShowDelay(int delay)
 		{ SendMessage(WM_COMMAND, TW_SET_SHOWDELAY, (LPARAM)delay); }
 	inline int GetShowDelay(void)
-		{ return SendMessage(WM_COMMAND, TW_GET_SHOWDELAY); }
+		{ return (int)SendMessage(WM_COMMAND, TW_GET_SHOWDELAY); }
 	inline void SetAutoPos(BOOL bAutoPos)
 		{ SendMessage(WM_COMMAND, TW_SET_AUTOPOS, (LPARAM)bAutoPos); }
 	inline int GetAutoPos(void)
-		{ return SendMessage(WM_COMMAND, TW_GET_AUTOPOS); }
+		{ return (int)SendMessage(WM_COMMAND, TW_GET_AUTOPOS); }
 	inline void ReflectMessage(const MSG *msg)
 		{ SendMessage(WM_COMMAND, TW_REFLECT_MESSAGE, (LPARAM)msg); }
 	inline void SetHPadding(int padding)
 		{ SendMessage(WM_COMMAND, TW_SET_HPADDING, (LPARAM)padding); }
 	inline int GetHPadding(void)
-		{ return SendMessage(WM_COMMAND, TW_GET_HPADDING); }
+		{ return (int)SendMessage(WM_COMMAND, TW_GET_HPADDING); }
 	inline void SetVPadding(int padding)
 		{ SendMessage(WM_COMMAND, TW_SET_VPADDING, (LPARAM)padding); }
 	inline int GetVPadding(void)
-		{ return SendMessage(WM_COMMAND, TW_GET_VPADDING); }
+		{ return (int)SendMessage(WM_COMMAND, TW_GET_VPADDING); }
 	inline CWnd *GetTipWndOwner(void)
 		{ return CWnd::FromHandle((HWND)SendMessage(WM_COMMAND, TW_GET_OWNER)); }
 };
