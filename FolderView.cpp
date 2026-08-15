@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "spacemonger.h"
 #include "FolderView.h"
+#include "AsyncScanEngine.h"
 #include "MainFrm.h"
 #include "CommandPolicy.h"
 #include "TipWnd.h"
@@ -753,31 +754,39 @@ void CFolderView::MinimalDrawDisplayFolder(CDC *pDC, const TreemapNode *cur, BOO
 		else ty = y + (h - size.cy) / 2;
 
 		if (cur->flags & 2) {
-			// There's only one free-space block, so we can afford to
-			// be a little less efficient with it.
-			CFolderTree *ft = (CFolderTree *)GetDocument();
-			CString string;
-			ui64 ts = ft->totalspace;
-			if (ts <= 1) ts = 1;
-			si32 freepercent = (si32)(ft->freespace * (ui64)1000 / ts);
-			string.Format(CurLang->freespace_format, freepercent / 10, freepercent % 10);
-			size = pDC->GetTextExtent(string);
-			if (size.cx > w-2) tx = x + 2;
-			else tx = x + (w - size.cx) / 2;
-			pDC->TextOut(tx, ty-18, string);
+			if (cur->name != NULL && wcscmp(cur->name, L"<Scanning...>") == 0) {
+				CString string = "Scanning...";
+				pDC->TextOut(tx, ty, string);
+			}
+			else {
+				// There's only one free-space block, so we can afford to
+				// be a little less efficient with it.
+				CFolderTree *ft = (CFolderTree *)GetDocument();
+				if (ft != NULL) {
+					CString string;
+					ui64 ts = ft->totalspace;
+					if (ts <= 1) ts = 1;
+					si32 freepercent = (si32)(ft->freespace * (ui64)1000 / ts);
+					string.Format(CurLang->freespace_format, freepercent / 10, freepercent % 10);
+					size = pDC->GetTextExtent(string);
+					if (size.cx > w-2) tx = x + 2;
+					else tx = x + (w - size.cx) / 2;
+					pDC->TextOut(tx, ty-18, string);
 
-			string = GetSizeString(ft->freespace, ft->totalspace, 0) + " " + CurLang->free;
-			pDC->TextOut(tx, ty-6, string);
-			
-			string.Format("%s  %u", (const char*)CString(CurLang->files_total), ft->numfiles);
-			pDC->TextOut(tx, ty+6, string);
-			
-			string.Format("%s  %u", (const char*)CString(CurLang->folders_total), ft->numfolders);
-			pDC->TextOut(tx, ty+15, string);
+					string = GetSizeString(ft->freespace, ft->totalspace, 0) + " " + CurLang->free;
+					pDC->TextOut(tx, ty-6, string);
+					
+					string.Format("%s  %u", (const char*)CString(CurLang->files_total), ft->numfiles);
+					pDC->TextOut(tx, ty+6, string);
+					
+					string.Format("%s  %u", (const char*)CString(CurLang->folders_total), ft->numfolders);
+					pDC->TextOut(tx, ty+15, string);
+				}
+			}
 		}
 		else {
 			if (sel) pDC->SetTextColor(RGB(0xFF,0xFF,0xFF));
-			if (!(cur->flags & 1) && h >= 36 && w >= 48) {
+			if (!(cur->flags & 1) && h >= 36 && w >= 48 && cur->source != NULL && cur->index != (ui32)-1) {
 				// Enough room (probably) for the date and file size
 				CString string;
 				CSize size;
@@ -799,6 +808,33 @@ void CFolderView::MinimalDrawDisplayFolder(CDC *pDC, const TreemapNode *cur, BOO
 			if (sel) pDC->SetTextColor(RGB(0,0,0));
 		}
 		pDC->SelectClipRgn(NULL);
+	}
+}
+
+void CFolderView::UpdateLiveScanLayout(AsyncScanEngine& engine, ui64 totalspace, ui64 freespace)
+{
+	CRect rect;
+	GetClientRect(&rect);
+	m_width = rect.right - rect.left;
+	m_height = rect.bottom - rect.top;
+
+	if (m_width <= 0 || m_height <= 0) return;
+
+	TreemapConfig config;
+	config.density = theApp.m_settings.density;
+	config.bias = theApp.m_settings.bias;
+	config.showFreeSpace = (showfreespace != 0);
+	config.dpi = (int)GetWindowDpi(m_hWnd);
+
+	selected = NULL;
+	lastcur = NULL;
+
+	engine.GenerateLiveLayout(m_width - 1, m_height - 1, totalspace, freespace, config, m_layoutNodes);
+
+	CDC *dc = GetDC();
+	if (dc != NULL) {
+		OnDraw(dc);
+		ReleaseDC(dc);
 	}
 }
 

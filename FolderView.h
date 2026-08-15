@@ -8,12 +8,15 @@
 
 typedef TreemapNode CDisplayFolder;
 
+class AsyncScanEngine;
+
 class CFolderView : public CFreeView {
 public:
 	CFolderView();
 	DECLARE_DYNCREATE(CFolderView)
 	virtual ~CFolderView();
 
+	void UpdateLiveScanLayout(AsyncScanEngine& engine, ui64 totalspace, ui64 freespace);
 	virtual void SetDocument(CFreeDoc *doc = NULL);
 	virtual void SetPalette(void);
 

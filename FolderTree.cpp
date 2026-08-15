@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "spacemonger.h"
 #include "FolderTree.h"
+#include "FolderView.h"
 #include "AsyncScanEngine.h"
 #include "PathUtil.h"
 #include "Lang.h"
@@ -64,6 +65,7 @@ BOOL CFolderTree::LoadTree(const CString &path, BOOL includespace, CWnd *modalwi
 	};
 
 	DWORD last_ui_tick = 0;
+	DWORD last_render_tick = 0;
 	while (engine.IsScanning()) {
 		if (!pumpMessages()) return 0;
 
@@ -76,6 +78,14 @@ BOOL CFolderTree::LoadTree(const CString &path, BOOL includespace, CWnd *modalwi
 		if (now - last_ui_tick >= 50) {
 			last_ui_tick = now;
 			dialog.UpdateFromProgress(engine.GetProgress(), usedspace);
+		}
+
+		if (now - last_render_tick >= 100) {
+			last_render_tick = now;
+			CFolderView *fv = (CFolderView *)theApp.m_view;
+			if (fv != NULL && ::IsWindow(fv->m_hWnd)) {
+				fv->UpdateLiveScanLayout(engine, totalspace, freespace);
+			}
 		}
 
 		::Sleep(15);
