@@ -23,7 +23,7 @@ incremental modernization rather than a full rewrite.
 
 ## Code Health & Architecture
 
-- [ ] **Extract Treemap Layout Engine into a Pure Module**
+- [x] **Extract Treemap Layout Engine into a Pure Module**
       *Background:* Treemap coordinate partitioning (`BuildFolderLayout`, `SizeFolders`) is currently embedded directly inside `CFolderView`, interleaved with MFC device context drawing. Extracting the spatial partitioning algorithm into an independent, non-UI module (following the pattern of `DiskUsage`) will allow headless automated unit testing for tricky geometries, degenerate aspect ratios, and zero-byte files without requiring an initialized Win32 window.
 - [x] Replace fixed-size buffers and unsafe formatting calls in narrow passes.
 - [ ] Decide whether unused `CFolder` mutation methods (`DelFile`, `RenameFile`, `FindFile`) should be implemented or removed.
