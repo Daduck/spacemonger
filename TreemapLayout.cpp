@@ -192,10 +192,6 @@ static void ComputeLayoutInternal(
 	std::vector<int> indices(folder->cur);
 	for (unsigned int i = 0; i < folder->cur; i++) indices[i] = (int)i;
 
-	std::stable_sort(indices.begin(), indices.end(), [&](int a, int b) {
-		return folder->sizes[a] > folder->sizes[b];
-	});
-
 	std::vector<int> scratch(folder->cur);
 	SizeFolders(x, y, w, h, folder, indices.data(), scratch.data(), (int)folder->cur, depth, config, hmin, vmin, outNodes);
 }

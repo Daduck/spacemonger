@@ -81,7 +81,7 @@ BOOL CFolderTree::LoadTree(const CString &path, BOOL includespace, CWnd *modalwi
 			dialog.UpdateFromProgress(engine.GetProgress(), usedspace);
 		}
 
-		if (now - last_render_tick >= 100) {
+		if (now - last_render_tick >= 250) {
 			last_render_tick = now;
 			CFolderView *fv = (CFolderView *)theApp.m_view;
 			if (fv != NULL && ::IsWindow(fv->m_hWnd)) {
