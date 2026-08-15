@@ -324,7 +324,7 @@ void CSpaceMonger::OnIgnoreUpdate(CCmdUI *ui)
 void GeneralIgnoreUpdate(CCmdUI *ui)
 {
 	CFolderView *fv = (CFolderView *)theApp.m_view;
-	CDisplayFolder *cur = fv->selected;
+	const TreemapNode *cur = fv->selected;
 	int zoom = fv->zoomlevel;
 
 	if (ui->m_nID == ID_FILE_DELETE) {

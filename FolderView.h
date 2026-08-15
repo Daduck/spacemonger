@@ -3,16 +3,10 @@
 
 #include "FolderTree.h"
 #include "TipWnd.h"
+#include "TreemapLayout.h"
+#include <vector>
 
-struct CDisplayFolder {
-	wchar_t *name;
-	si32 depth;
-	ui32 flags;				// 1=folder
-	CFolder *source;
-	ui32 index;
-	si16 x, y, w, h;
-	CDisplayFolder *next;
-};
+typedef TreemapNode CDisplayFolder;
 
 class CFolderView : public CFreeView {
 public:
@@ -24,11 +18,11 @@ public:
 	virtual void SetPalette(void);
 
 	void BuildTitleReverse(CFolder *folder, CString &string);
-	CDisplayFolder *GetDisplayFolderFromPoint(const CPoint &point);
-	CDisplayFolder *GetContainerDisplayFolderFromPoint(const CPoint &point);
+	const TreemapNode *GetDisplayFolderFromPoint(const CPoint &point);
+	const TreemapNode *GetContainerDisplayFolderFromPoint(const CPoint &point);
 	void HighlightPathAtPoint(const CPoint &point);
 
-	void ZoomIn(CDisplayFolder *folder);
+	void ZoomIn(const TreemapNode *folder);
 	void ZoomOut(void);
 	void ZoomFull(void);
 	void ShowFreeSpace(BOOL show);
@@ -45,10 +39,10 @@ public:
 	void UpdateTitleBar(void);
 	void RecreateFonts(void);
 
-	void SelectFolder(CDisplayFolder *cur);
+	void SelectFolder(const TreemapNode *cur);
 	void BuildTitleReverseW(CFolder *folder, std::wstring& string);
-	std::wstring BuildItemPathW(CDisplayFolder *folder);
-	std::wstring BuildContainerPathW(CDisplayFolder *folder);
+	std::wstring BuildItemPathW(const TreemapNode *folder);
+	std::wstring BuildContainerPathW(const TreemapNode *folder);
 
 	//{{AFX_VIRTUAL(CFolderView)
 protected:
@@ -74,31 +68,25 @@ public:
 	virtual void OnUpdate(CFreeDoc *doc);
 
 protected:
-	void BuildFolderLayout(int x, int y, int w, int h, CFolder *folder, int depth);
-	void SizeFolders(int x, int y, int w, int h, CFolder *folder, int *index, int *scratch, int numindices, int depth);
-	CDisplayFolder *AddDisplayFolder(CFolder *source, ui32 index,
-		si32 depth, si16 x, si16 y, si16 w, si16 h, ui32 flags);
-	void ClearDisplayFolders(void);
-	void DrawDisplayFolder(CDC *pDC, CDisplayFolder *cur, BOOL selected);
-	void MinimalDrawDisplayFolder(CDC *pDC, CDisplayFolder *cur, BOOL selected);
+	void DrawDisplayFolder(CDC *pDC, const TreemapNode *cur, BOOL selected);
+	void MinimalDrawDisplayFolder(CDC *pDC, const TreemapNode *cur, BOOL selected);
 	void AnimateBox(const CRect &start, const CRect &end);
-	void SetupInfoTip(CDisplayFolder *cur);
-	void SetupNameTip(CDisplayFolder *cur);
+	void SetupInfoTip(const TreemapNode *cur);
+	void SetupNameTip(const TreemapNode *cur);
 
 protected:
 	CPalette m_palette;
 	CBrush black, white;
 	CFont minifont;
 	CFolder *rootfolder;
-	CDisplayFolder *displayfolders, *displayend;
-	int vmin, hmin;
+	std::vector<TreemapNode> m_layoutNodes;
 	CTipWnd m_infotipwnd;
 	CTipWnd m_nametipwnd;
-	CDisplayFolder *lastcur;
+	const TreemapNode *lastcur;
 
 public:
 	int zoomlevel;
-	CDisplayFolder *selected;
+	const TreemapNode *selected;
 	BOOL showfreespace;
 };
 

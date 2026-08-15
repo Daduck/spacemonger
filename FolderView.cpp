@@ -84,7 +84,6 @@ CFolderView::CFolderView()
 {
 	rootfolder = NULL;
 	selected = NULL;
-	displayfolders = displayend = NULL;
 	zoomlevel = 0;
 	showfreespace = 1;
 	lastcur = NULL;
@@ -92,7 +91,7 @@ CFolderView::CFolderView()
 
 CFolderView::~CFolderView()
 {
-	ClearDisplayFolders();
+	m_layoutNodes.clear();
 }
 
 BEGIN_MESSAGE_MAP(CFolderView, CFreeView)
@@ -224,96 +223,54 @@ void CFolderView::OnDestroy()
 	CFreeView::OnDestroy();
 }
 
-CDisplayFolder *CFolderView::GetDisplayFolderFromPoint(const CPoint &point)
+const TreemapNode *CFolderView::GetDisplayFolderFromPoint(const CPoint &point)
 {
-	CDisplayFolder *cur = displayfolders;
-
-	while (cur != NULL) {
-		if (point.x > cur->x && point.y > cur->y
-			&& point.x < cur->x + cur->w && point.y < cur->y + cur->h) {
-			if (cur->flags & 1) {
-				if (point.x < cur->x+3 || point.y < cur->y+12
-					|| point.x > cur->x+cur->w-3 || point.y > cur->y+cur->h-3)
-					break;
-			}
-			else break;
-		}
-		cur = cur->next;
-	}
-
-	if (cur != NULL && cur->name == NULL)
-		cur = NULL;
-	if (cur != NULL && cur->name[0] == '<')
-		cur = NULL;
-
-	return cur;
+	return TreemapEngine::HitTestItem(m_layoutNodes, point.x, point.y);
 }
 
-CDisplayFolder *CFolderView::GetContainerDisplayFolderFromPoint(const CPoint &point)
+const TreemapNode *CFolderView::GetContainerDisplayFolderFromPoint(const CPoint &point)
 {
-	CDisplayFolder *cur = displayfolders, *best = NULL;
-	CRect minrect(-32768,-32768,32767,32767);
-
-	while (cur != NULL) {
-		if (cur->flags & 1
-			&& point.x > cur->x && point.y > cur->y
-			&& point.x < cur->x + cur->w && point.y < cur->y + cur->h
-			&& cur->x >= minrect.left && cur->y >= minrect.top
-			&& cur->x+cur->w <= minrect.right && cur->y+cur->h <= minrect.bottom) {
-			// Found a tighter folder, so use it.
-			minrect.left = cur->x;
-			minrect.top = cur->y;
-			minrect.right = cur->x+cur->w;
-			minrect.bottom = cur->y+cur->h;
-			best = cur;
-		}
-		cur = cur->next;
-	}
-
-	return best;
+	return TreemapEngine::HitTestContainer(m_layoutNodes, point.x, point.y);
 }
 
 void CFolderView::HighlightPathAtPoint(const CPoint &point)
 {
-	CDisplayFolder *cur = displayfolders;
-
 	CDC *pDC = GetDC();
 	pDC->SelectObject(&minifont);
 	pDC->SetBkMode(TRANSPARENT);
 	pDC->SetTextAlign(TA_LEFT | TA_TOP | TA_NOUPDATECP);
 	pDC->SelectPalette(&m_palette, 0);
-	while (cur != NULL) {
-		if (cur->name != NULL && cur->name[0] != '<') {
-			if (point.x > cur->x && point.y > cur->y
-				&& point.x < cur->x + cur->w && point.y < cur->y + cur->h) {
-				if (!(cur->flags & 4)) {
-					cur->flags |= 4;
-					MinimalDrawDisplayFolder(pDC, cur, selected == cur);
+	for (auto &cur : m_layoutNodes) {
+		if (cur.name != NULL && cur.name[0] != '<') {
+			if (point.x > cur.x && point.y > cur.y
+				&& point.x < cur.x + cur.w && point.y < cur.y + cur.h) {
+				if (!(cur.flags & TREEMAP_FLAG_HOVER)) {
+					cur.flags |= TREEMAP_FLAG_HOVER;
+					MinimalDrawDisplayFolder(pDC, &cur, selected == &cur);
 				}
 			}
 			else {
-				if (cur->flags & 4) {
-					cur->flags &= ~4;
-					MinimalDrawDisplayFolder(pDC, cur, selected == cur);
+				if (cur.flags & TREEMAP_FLAG_HOVER) {
+					cur.flags &= ~TREEMAP_FLAG_HOVER;
+					MinimalDrawDisplayFolder(pDC, &cur, selected == &cur);
 				}
 			}
 		}
-		cur = cur->next;
 	}
 	ReleaseDC(pDC);
 }
 
 void CFolderView::OnLButtonDown(UINT flags, CPoint point)
 {
-	CDisplayFolder *cur = GetDisplayFolderFromPoint(point);
+	const TreemapNode *cur = GetDisplayFolderFromPoint(point);
 	SelectFolder(cur);
 }
 
 void CFolderView::OnLButtonDblClk(UINT flags, CPoint point)
 {
-	CDisplayFolder *cur = GetDisplayFolderFromPoint(point);
+	const TreemapNode *cur = GetDisplayFolderFromPoint(point);
 	if (cur != NULL) {
-		if (cur->flags & 1)
+		if (cur->flags & TREEMAP_FLAG_FOLDER)
 			ZoomIn(cur);
 		else {
 			CSpaceMonger *app = (CSpaceMonger *)AfxGetApp();
@@ -326,7 +283,7 @@ void CFolderView::OnMouseMove(UINT nFlags, CPoint point)
 {
 	if (nFlags != 0) return;
 
-	CDisplayFolder *cur = GetDisplayFolderFromPoint(point);
+	const TreemapNode *cur = GetDisplayFolderFromPoint(point);
 
 	if (cur != lastcur) {
 		HighlightPathAtPoint(point);
@@ -391,7 +348,7 @@ static void PrintDate(CString &string, ui64 time)
 	string += timebuf;
 }
 
-void CFolderView::SetupInfoTip(CDisplayFolder *cur)
+void CFolderView::SetupInfoTip(const TreemapNode *cur)
 {
 	m_infotipwnd.EnableWindow(0);
 
@@ -450,7 +407,7 @@ void CFolderView::SetupInfoTip(CDisplayFolder *cur)
 	m_infotipwnd.RedrawWindow();
 }
 
-void CFolderView::SetupNameTip(CDisplayFolder *cur)
+void CFolderView::SetupNameTip(const TreemapNode *cur)
 {
 	m_nametipwnd.EnableWindow(0);
 
@@ -524,7 +481,7 @@ static void AddMenuEntry(HMENU menu, UINT cmd = 0, const char *string = NULL,
 
 void CFolderView::OnRButtonUp(UINT flags, CPoint point)
 {
-	CDisplayFolder *cur = GetDisplayFolderFromPoint(point);
+	const TreemapNode *cur = GetDisplayFolderFromPoint(point);
 	SelectFolder(cur);
 	ClientToScreen(&point);
 
@@ -556,7 +513,7 @@ void CFolderView::OnRButtonUp(UINT flags, CPoint point)
 	if (showinfo) m_infotipwnd.EnableWindow(1);
 }
 
-void CFolderView::SelectFolder(CDisplayFolder *cur)
+void CFolderView::SelectFolder(const TreemapNode *cur)
 {
 	if (cur == selected) return;
 
@@ -675,7 +632,7 @@ void CFolderView::BuildTitleReverseW(CFolder *folder, std::wstring& string)
 		string += L'\\';
 }
 
-std::wstring CFolderView::BuildContainerPathW(CDisplayFolder *folder)
+std::wstring CFolderView::BuildContainerPathW(const TreemapNode *folder)
 {
 	CFolderTree *tree = (CFolderTree *)GetDocument();
 	std::wstring relativePath;
@@ -686,7 +643,7 @@ std::wstring CFolderView::BuildContainerPathW(CDisplayFolder *folder)
 	return PathUtil::BuildWidePath(tree == NULL ? "" : tree->m_path, relativePath, NULL);
 }
 
-std::wstring CFolderView::BuildItemPathW(CDisplayFolder *folder)
+std::wstring CFolderView::BuildItemPathW(const TreemapNode *folder)
 {
 	CFolderTree *tree = (CFolderTree *)GetDocument();
 	std::wstring relativePath;
@@ -709,19 +666,16 @@ void CFolderView::OnDraw(CDC *pDC)
 	pDC->SelectPalette(&m_palette, 0);
 	pDC->RealizePalette();
 
-	CDisplayFolder *cur = displayfolders;
-
 	DrawBox(pDC->m_hDC, ColorFlat, 0, 0, m_width, m_height);
-	if (cur == NULL)
+	if (m_layoutNodes.empty())
 		FillBox(pDC->m_hDC, ColorFlat, 1, 1, m_width-2, m_height-2);
 
-	while (cur != NULL) {
-		MinimalDrawDisplayFolder(pDC, cur, selected == cur);
-		cur = cur->next;
+	for (const auto &cur : m_layoutNodes) {
+		MinimalDrawDisplayFolder(pDC, &cur, selected == &cur);
 	}
 }
 
-void CFolderView::DrawDisplayFolder(CDC *pDC, CDisplayFolder *cur, BOOL sel)
+void CFolderView::DrawDisplayFolder(CDC *pDC, const TreemapNode *cur, BOOL sel)
 {
 	pDC->SelectObject(&minifont);
 	pDC->SetBkMode(TRANSPARENT);
@@ -731,7 +685,7 @@ void CFolderView::DrawDisplayFolder(CDC *pDC, CDisplayFolder *cur, BOOL sel)
 	MinimalDrawDisplayFolder(pDC, cur, sel);
 }
 
-void CFolderView::MinimalDrawDisplayFolder(CDC *pDC, CDisplayFolder *cur, BOOL sel)
+void CFolderView::MinimalDrawDisplayFolder(CDC *pDC, const TreemapNode *cur, BOOL sel)
 {
 	int x, y, w, h;
 
@@ -899,7 +853,9 @@ void CFolderView::OnSize(UINT nType, int cx, int cy)
 	m_width = cx = rect.right - rect.left;
 	m_height = cy = rect.bottom - rect.top;
 
-	ClearDisplayFolders();
+	m_layoutNodes.clear();
+	selected = NULL;
+	lastcur = NULL;
 
 	if (rootfolder == NULL) {
 		if (GetDocument() == NULL) return;
@@ -908,195 +864,21 @@ void CFolderView::OnSize(UINT nType, int cx, int cy)
 		if (rootfolder == NULL) return;
 	}
 
-	BuildFolderLayout(0, 0, cx - 1, cy - 1, rootfolder, zoomlevel);
+	TreemapConfig config;
+	config.density = theApp.m_settings.density;
+	config.bias = theApp.m_settings.bias;
+	config.showFreeSpace = (showfreespace != 0);
+	config.dpi = (int)GetWindowDpi(m_hWnd);
+
+	TreemapEngine::ComputeLayout(0, 0, cx - 1, cy - 1, rootfolder, zoomlevel, config, m_layoutNodes);
 }
 
-CDisplayFolder *CFolderView::AddDisplayFolder(CFolder *source, ui32 index,
-	si32 depth, si16 x, si16 y, si16 w, si16 h, ui32 flags)
-{
-	CDisplayFolder *newfolder = new CDisplayFolder;
-	wchar_t c;
-
-	if (source != NULL && index != (ui32)-1) {
-		newfolder->name = source->names[index];
-		c = newfolder->name[0];
-	}
-	else newfolder->name = NULL, c = 0;
-
-	if (c == L'*' || c == L'<' || c == L'>' || c == L'?' || c == L'|')
-		newfolder->depth = -1, flags |= 2;
-	else newfolder->depth = depth;
-
-	newfolder->flags = flags;
-	newfolder->source = source;
-	newfolder->index = index;
-	newfolder->x = x, newfolder->y = y;
-	newfolder->w = w, newfolder->h = h;
-	newfolder->next = NULL;
-
-	if (displayend == NULL)
-		displayfolders = displayend = newfolder;
-	else
-		displayend = (displayend->next = newfolder);
-
-	return(newfolder);
-}
-
-void CFolderView::ClearDisplayFolders(void)
-{
-	CDisplayFolder *cur = displayfolders, *temp;
-	while (cur != NULL) {
-		temp = cur->next;
-		delete cur;
-		cur = temp;
-	}
-	displayfolders = NULL;
-	displayend = NULL;
-	selected = NULL;
-}
-
-void CFolderView::BuildFolderLayout(int x, int y, int w, int h, CFolder *folder, int depth)
-{
-	unsigned int i;
-
-	if (folder == NULL) return;
-
-	int *indices = new int[folder->cur];
-	for (i = 0; i < folder->cur; i++) indices[i] = i;
-
-	static const int minsizes[][2] = {
-		{ 96, 64, },
-		{ 64, 48, },
-		{ 48, 32, },
-		{ 32, 24, },
-		{ 24, 16, },
-		{ 16, 12, },
-		{ 8, 6, },
-	};
-	UINT dpi = GetWindowDpi(m_hWnd);
-	hmin = MulDiv(minsizes[theApp.m_settings.density + 3][0], (int)dpi, 96);
-	vmin = MulDiv(minsizes[theApp.m_settings.density + 3][1], (int)dpi, 96);
-
-	int *scratch = new (std::nothrow) int[folder->cur];
-	if (scratch != NULL) {
-		SizeFolders(x, y, w, h, folder, indices, scratch, (int)folder->cur, depth);
-		delete[] scratch;
-	}
-
-	delete[] indices;
-}
-
-void CFolderView::SizeFolders(int x, int y, int w, int h, CFolder *folder, int *index, int *scratch, int numindices, int depth)
-{
-	if (folder == NULL) return;
-
-	ui64 totalspace = folder->SizeTotal();
-
-	int numlist1 = 0, numlist2 = 0, largest;
-	int list2_back = numindices;
-	si64 list1sum = 0, list2sum = 0, bignum;
-	int x1, y1, w1, h1;
-	int x2, y2, w2, h2;
-	int split;
-
-	// Split the lists evenly.  We assume the sizes are sorted
-	// in descending order.  Overall, this is a greedy algorithm,
-	// so it should produce fairly good results.
-
-	for (largest = 0; largest < numindices; largest++) {
-		bignum = (si64)folder->sizes[index[largest]];
-		if (folder->names[index[largest]][0] == L'<' && !showfreespace)
-			bignum = 0;
-		if (bignum != 0) {
-			if (list1sum <= list2sum) {
-				scratch[numlist1++] = index[largest];
-				list1sum += bignum;
-			}
-			else {
-				scratch[--list2_back] = index[largest];
-				list2sum += bignum;
-				numlist2++;
-			}
-		}
-	}
-
-	// Don't bother if the files have no space
-	if (list1sum + list2sum <= 0) {
-		return;
-	}
-
-	// Copy lists back into the index array
-	for (int i = 0; i < numlist1; i++) {
-		index[i] = scratch[i];
-	}
-	for (int i = 0; i < numlist2; i++) {
-		index[numlist1 + i] = scratch[numindices - 1 - i];
-	}
-
-	// Okay, we're now as even as we can safely get.  Now we know how to
-	// split up the space.
-	int wbias, hbias;
-	if (theApp.m_settings.bias > 0)
-		wbias = theApp.m_settings.bias + 8, hbias = 8;
-	else if (theApp.m_settings.bias < 0)
-		hbias = -theApp.m_settings.bias + 8, wbias = 8;
-	else wbias = 8, hbias = 8;
-	if (((w * wbias) / 8) > ((h * hbias) / 8)) {
-		split = (int)(((si64)w * list1sum) / (list1sum + list2sum));
-		x1 = x, y1 = y, w1 = split, h1 = h;
-		x2 = x + split, y2 = y, w2 = w - split, h2 = h;
-	}
-	else {
-		split = (int)(((si64)h * list1sum) / (list1sum + list2sum));
-		x1 = x, y1 = y, w1 = w, h1 = split;
-		x2 = x, y2 = y + split, w2 = w, h2 = h - split;
-	}
-	// Now if a given rectangle has more than one file and is
-	// large enough to be subdivided again, subdivide again
-	if (numlist1 > 1 && w1 > hmin && h1 > vmin)
-		SizeFolders(x1, y1, w1, h1, folder, index, scratch, numlist1, depth);
-	else if (numlist1 > 0) {
-		if (w1 > hmin && h1 > vmin) {
-			AddDisplayFolder(folder, index[0],
-				depth, x1, y1, w1, h1,
-				(folder->children[index[0]] != NULL));
-			if (folder->children[index[0]] != NULL) {
-				if (w1 > hmin && h1 > vmin) {
-					BuildFolderLayout(x1 + 3, y1 + 12, w1 - 6, h1 - 15,
-						folder->children[index[0]], depth+1);
-				}
-				else AddDisplayFolder(folder, (ui32)-1, depth + 1,
-					x2 + 3, y2 + 12, w2 - 6, h2 - 15, 0);
-			}
-		}
-		else AddDisplayFolder(folder, (ui32)-1, depth, x1, y1, w1, h1, 0);
-	}
-	if (numlist2 > 1 && w2 > hmin && h2 > vmin)
-		SizeFolders(x2, y2, w2, h2, folder, index + numlist1, scratch, numlist2, depth);
-	else if (numlist2 > 0) {
-		if (w2 > hmin && h2 > vmin) {
-			AddDisplayFolder(folder, index[numlist1],
-				depth, x2, y2, w2, h2,
-				(folder->children[index[numlist1]] != NULL));
-			if (folder->children[index[numlist1]] != NULL) {
-				if (w2 > hmin && h2 > vmin) {
-					BuildFolderLayout(x2 + 3, y2 + 12, w2 - 6, h2 - 15,
-						folder->children[index[numlist1]], depth+1);
-				}
-				else AddDisplayFolder(folder, (ui32)-1, depth + 1,
-					x2 + 3, y2 + 12, w2 - 6, h2 - 15, 0);
-			}
-		}
-		else AddDisplayFolder(folder, (ui32)-1, depth, x2, y2, w2, h2, 0);
-	}
-}
-
-void CFolderView::ZoomIn(CDisplayFolder *folder)
+void CFolderView::ZoomIn(const TreemapNode *folder)
 {
 	CFolderTree *doc = (CFolderTree *)GetDocument();
 	CFolder *oldroot = rootfolder;
 
-	if (folder != NULL && folder->source->children[folder->index] != NULL)
+	if (folder != NULL && folder->source != NULL && folder->index != (ui32)-1 && folder->source->children[folder->index] != NULL)
 		rootfolder = folder->source->children[folder->index];
 
 	if (rootfolder == oldroot) return;
