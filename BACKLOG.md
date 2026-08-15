@@ -20,6 +20,8 @@ incremental modernization rather than a full rewrite.
       and cloud placeholders.
 - [x] **Multi-Threaded / Asynchronous Scanning**
       *Background:* `CFolder::LoadFolder` currently runs synchronously on the main thread, intermittently pumping messages via `::PeekMessage` to keep the UI from completely freezing. On modern multi-core systems and high-IOPS NVMe SSDs, single-threaded synchronous directory enumeration leaves significant I/O throughput untapped. Decoupling directory walking into a background worker thread pool (or task queue with work-stealing) with thread-safe tree aggregation will cut scan times significantly on modern drives and keep the UI completely responsive.
+- [x] **Live Progressive Treemap Rendering During Scan**
+      *Background:* Render live snapshots of the treemap at 10 FPS directly behind the classic "Scanning Disk..." progress dialog as background worker threads discover files and folders, providing dynamic visual feedback without degrading NVMe/SSD scan throughput.
 
 ## Code Health & Architecture
 
