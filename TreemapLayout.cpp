@@ -143,13 +143,8 @@ static void SizeFolders(
 				depth, (si16)x1, (si16)y1, (si16)w1, (si16)h1,
 				(folder->children[index[0]] != nullptr ? TREEMAP_FLAG_FOLDER : TREEMAP_FLAG_NONE));
 			if (folder->children[index[0]] != nullptr) {
-				if (w1 > hmin && h1 > vmin) {
-					ComputeLayoutInternal(x1 + 3, y1 + 12, w1 - 6, h1 - 15,
-						folder->children[index[0]], depth + 1, config, hmin, vmin, outNodes);
-				} else {
-					AddNode(outNodes, folder, (ui32)-1, -1,
-						(si16)(x1 + 3), (si16)(y1 + 12), (si16)(w1 - 6), (si16)(h1 - 15), TREEMAP_FLAG_NONE);
-				}
+				ComputeLayoutInternal(x1 + 3, y1 + 12, w1 - 6, h1 - 15,
+					folder->children[index[0]], depth + 1, config, hmin, vmin, outNodes);
 			}
 		} else {
 			AddNode(outNodes, folder, (ui32)-1, -1, (si16)x1, (si16)y1, (si16)w1, (si16)h1, TREEMAP_FLAG_NONE);
@@ -165,13 +160,8 @@ static void SizeFolders(
 				depth, (si16)x2, (si16)y2, (si16)w2, (si16)h2,
 				(folder->children[index[numlist1]] != nullptr ? TREEMAP_FLAG_FOLDER : TREEMAP_FLAG_NONE));
 			if (folder->children[index[numlist1]] != nullptr) {
-				if (w2 > hmin && h2 > vmin) {
-					ComputeLayoutInternal(x2 + 3, y2 + 12, w2 - 6, h2 - 15,
-						folder->children[index[numlist1]], depth + 1, config, hmin, vmin, outNodes);
-				} else {
-					AddNode(outNodes, folder, (ui32)-1, -1,
-						(si16)(x2 + 3), (si16)(y2 + 12), (si16)(w2 - 6), (si16)(h2 - 15), TREEMAP_FLAG_NONE);
-				}
+				ComputeLayoutInternal(x2 + 3, y2 + 12, w2 - 6, h2 - 15,
+					folder->children[index[numlist1]], depth + 1, config, hmin, vmin, outNodes);
 			}
 		} else {
 			AddNode(outNodes, folder, (ui32)-1, -1, (si16)x2, (si16)y2, (si16)w2, (si16)h2, TREEMAP_FLAG_NONE);
@@ -191,6 +181,13 @@ static void ComputeLayoutInternal(
 
 	std::vector<int> indices(folder->cur);
 	for (unsigned int i = 0; i < folder->cur; i++) indices[i] = (int)i;
+
+	// The greedy split in SizeFolders assumes sizes in descending order.
+	// Finalized trees are already sorted, but live scan trees are in
+	// insertion order; stable_sort keeps finalized layouts unchanged.
+	std::stable_sort(indices.begin(), indices.end(), [folder](int a, int b) {
+		return folder->sizes[a] > folder->sizes[b];
+	});
 
 	std::vector<int> scratch(folder->cur);
 	SizeFolders(x, y, w, h, folder, indices.data(), scratch.data(), (int)folder->cur, depth, config, hmin, vmin, outNodes);
