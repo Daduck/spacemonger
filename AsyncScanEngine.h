@@ -54,12 +54,17 @@ public:
 
 	CFolder* DetachResult(CStringArena& targetArena);
 
+	// Produces a self-contained snapshot layout of the partially scanned tree.
+	// The returned nodes never point back into the live tree (source is null,
+	// names are copied into outNameStorage), so callers may keep and render
+	// them without holding any lock, even while workers keep scanning.
 	void GenerateLiveLayout(
 		int w, int h,
 		ui64 totalDiskSpace,
 		ui64 freeDiskSpace,
 		const TreemapConfig& config,
-		std::vector<TreemapNode>& outNodes
+		std::vector<TreemapNode>& outNodes,
+		std::vector<std::wstring>& outNameStorage
 	);
 
 private:

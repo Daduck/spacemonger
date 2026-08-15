@@ -854,20 +854,24 @@ void CFolderView::UpdateLiveScanLayout(AsyncScanEngine& engine, ui64 totalspace,
 	selected = NULL;
 	lastcur = NULL;
 
-	engine.GenerateLiveLayout(m_width - 1, m_height - 1, totalspace, freespace, config, m_layoutNodes);
+	engine.GenerateLiveLayout(m_width - 1, m_height - 1, totalspace, freespace, config, m_layoutNodes, m_liveNameStorage);
 
-	// Off-screen double buffer blit directly to screen DC with zero flicker
-	CClientDC dc(this);
-	CDC memDC;
-	memDC.CreateCompatibleDC(&dc);
-	CBitmap bitmap;
-	bitmap.CreateCompatibleBitmap(&dc, m_width, m_height);
-	CBitmap *oldBitmap = memDC.SelectObject(&bitmap);
+	// OnPaint already double-buffers, so route through the normal paint path.
+	InvalidateRect(NULL, FALSE);
+	UpdateWindow();
+}
 
-	OnDraw(&memDC);
+void CFolderView::ClearLiveScanLayout(void)
+{
+	m_layoutNodes.clear();
+	m_liveNameStorage.clear();
+	selected = NULL;
+	lastcur = NULL;
 
-	dc.BitBlt(0, 0, m_width, m_height, &memDC, 0, 0, SRCCOPY);
-	memDC.SelectObject(oldBitmap);
+	if (::IsWindow(m_hWnd)) {
+		InvalidateRect(NULL, FALSE);
+		UpdateWindow();
+	}
 }
 
 void CFolderView::SetDocument(CFreeDoc *doc)
@@ -922,6 +926,7 @@ void CFolderView::OnSize(UINT nType, int cx, int cy)
 	m_height = cy = rect.bottom - rect.top;
 
 	m_layoutNodes.clear();
+	m_liveNameStorage.clear();
 	selected = NULL;
 	lastcur = NULL;
 

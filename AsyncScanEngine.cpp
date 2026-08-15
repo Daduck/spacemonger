@@ -394,15 +394,17 @@ void AsyncScanEngine::GenerateLiveLayout(
 	ui64 totalDiskSpace,
 	ui64 freeDiskSpace,
 	const TreemapConfig& config,
-	std::vector<TreemapNode>& outNodes)
+	std::vector<TreemapNode>& outNodes,
+	std::vector<std::wstring>& outNameStorage)
 {
 	outNodes.clear();
+	outNameStorage.clear();
 	if (w <= 0 || h <= 0) return;
 
 	std::lock_guard<std::mutex> lock(m_treeMutex);
 	if (m_rootFolder == nullptr || m_cancelled.load()) return;
 
-	ui64 scannedBytes = ComputeLiveSizes(m_rootFolder);
+	ComputeLiveSizes(m_rootFolder);
 
 	unsigned int rootCount = m_rootFolder->cur;
 	if (rootCount == 0 && totalDiskSpace == 0) return;
@@ -452,6 +454,20 @@ void AsyncScanEngine::GenerateLiveLayout(
 	}
 
 	TreemapEngine::ComputeLayout(0, 0, w, h, &liveRoot, 0, config, outNodes);
+
+	// Detach the snapshot from the live tree: workers keep mutating folder
+	// arrays after this lock is released, and liveRoot dies with this frame.
+	// Copying names and nulling source makes the nodes safe to keep and draw.
+	// reserve() guarantees no reallocation, so c_str() pointers stay stable.
+	outNameStorage.reserve(outNodes.size());
+	for (auto& node : outNodes) {
+		if (node.name != nullptr) {
+			outNameStorage.emplace_back(node.name);
+			node.name = outNameStorage.back().c_str();
+		}
+		node.source = nullptr;
+		node.index = (ui32)-1;
+	}
 
 	// Cleanup without triggering CFolder recursive deletion
 	delete[] liveRoot.names;

@@ -263,10 +263,11 @@ static int test_concurrent_live_layout()
 
 	TreemapConfig config;
 	std::vector<TreemapNode> nodes;
+	std::vector<std::wstring> names;
 	int liveLayoutCalls = 0;
 
 	while (engine.IsScanning()) {
-		engine.GenerateLiveLayout(800, 600, 5000000, 1000000, config, nodes);
+		engine.GenerateLiveLayout(800, 600, 5000000, 1000000, config, nodes, names);
 		liveLayoutCalls++;
 		if (!nodes.empty()) {
 			for (const auto& n : nodes) {
@@ -282,8 +283,14 @@ static int test_concurrent_live_layout()
 	CHECK(liveLayoutCalls > 0);
 
 	// Final live layout call after scan completion
-	engine.GenerateLiveLayout(800, 600, 5000000, 1000000, config, nodes);
+	engine.GenerateLiveLayout(800, 600, 5000000, 1000000, config, nodes, names);
 	CHECK(!nodes.empty());
+
+	// Live nodes must be self-contained: no pointers back into the live tree.
+	for (const auto& n : nodes) {
+		CHECK(n.source == nullptr);
+		CHECK(n.index == (ui32)-1);
+	}
 
 	CStringArena targetArena;
 	CFolder* root = engine.DetachResult(targetArena);
@@ -329,7 +336,8 @@ static int test_live_layout_nested_folders()
 
 	TreemapConfig config;
 	std::vector<TreemapNode> nodes;
-	engine.GenerateLiveLayout(1000, 800, 200000, 50000, config, nodes);
+	std::vector<std::wstring> names;
+	engine.GenerateLiveLayout(1000, 800, 200000, 50000, config, nodes, names);
 
 	CHECK(!nodes.empty());
 
@@ -417,11 +425,12 @@ static int test_live_layout_during_active_multilevel_scan()
 
 	TreemapConfig config;
 	std::vector<TreemapNode> nodes;
+	std::vector<std::wstring> names;
 	bool observedNestedFolderDuringScan = false;
 	bool observedChildFileDuringScan = false;
 
 	while (engine.IsScanning()) {
-		engine.GenerateLiveLayout(1024, 768, 1000000, 200000, config, nodes);
+		engine.GenerateLiveLayout(1024, 768, 1000000, 200000, config, nodes, names);
 		for (const auto& n : nodes) {
 			if (n.IsFolder() && n.depth >= 1) {
 				observedNestedFolderDuringScan = true;
@@ -437,7 +446,7 @@ static int test_live_layout_during_active_multilevel_scan()
 	CHECK(!engine.IsCancelled());
 
 	// Must have observed nested folders and files during or immediately upon scan
-	engine.GenerateLiveLayout(1024, 768, 1000000, 200000, config, nodes);
+	engine.GenerateLiveLayout(1024, 768, 1000000, 200000, config, nodes, names);
 	for (const auto& n : nodes) {
 		if (n.IsFolder() && n.depth >= 1) observedNestedFolderDuringScan = true;
 		if (!n.IsFolder() && n.depth >= 1) observedChildFileDuringScan = true;

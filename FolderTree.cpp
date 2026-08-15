@@ -67,6 +67,8 @@ BOOL CFolderTree::LoadTree(const CString &path, BOOL includespace, CWnd *modalwi
 
 	DWORD last_ui_tick = 0;
 	DWORD last_render_tick = 0;
+	ui64 last_render_bytes = (ui64)-1;
+	ui64 last_render_entries = (ui64)-1;
 	while (engine.IsScanning()) {
 		if (!pumpMessages()) return 0;
 
@@ -85,7 +87,15 @@ BOOL CFolderTree::LoadTree(const CString &path, BOOL includespace, CWnd *modalwi
 			last_render_tick = now;
 			CFolderView *fv = (CFolderView *)theApp.m_view;
 			if (fv != NULL && ::IsWindow(fv->m_hWnd)) {
-				fv->UpdateLiveScanLayout(engine, totalspace, freespace);
+				// Re-walking and re-laying-out the tree stalls the workers
+				// (it holds the tree lock), so skip it when nothing changed.
+				ScanProgress progress = engine.GetProgress();
+				ui64 entries = progress.numFiles + progress.numFolders;
+				if (progress.bytesScanned != last_render_bytes || entries != last_render_entries) {
+					last_render_bytes = progress.bytesScanned;
+					last_render_entries = entries;
+					fv->UpdateLiveScanLayout(engine, totalspace, freespace);
+				}
 			}
 		}
 
@@ -104,6 +114,12 @@ BOOL CFolderTree::LoadTree(const CString &path, BOOL includespace, CWnd *modalwi
 	engine.WaitForCompletion();
 
 	if (dialog.cancelled || engine.IsCancelled()) {
+		// The view may still show the last live-scan frame; drop it so a
+		// dead scan's half-built map doesn't linger on screen.
+		CFolderView *fv = (CFolderView *)theApp.m_view;
+		if (fv != NULL && ::IsWindow(fv->m_hWnd)) {
+			fv->ClearLiveScanLayout();
+		}
 		if (root != NULL) { delete root; root = NULL; }
 		nameArena.Reset();
 		root = cur = NULL;

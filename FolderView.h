@@ -17,6 +17,7 @@ public:
 	virtual ~CFolderView();
 
 	void UpdateLiveScanLayout(AsyncScanEngine& engine, ui64 totalspace, ui64 freespace);
+	void ClearLiveScanLayout(void);
 	virtual void SetDocument(CFreeDoc *doc = NULL);
 	virtual void SetPalette(void);
 
@@ -85,6 +86,9 @@ protected:
 	CFont minifont;
 	CFolder *rootfolder;
 	std::vector<TreemapNode> m_layoutNodes;
+	// Owns the name strings referenced by live-scan layout nodes, so the
+	// nodes outlive the scan engine's arenas (e.g. on a cancelled scan).
+	std::vector<std::wstring> m_liveNameStorage;
 	CTipWnd m_infotipwnd;
 	CTipWnd m_nametipwnd;
 	const TreemapNode *lastcur;
