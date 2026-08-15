@@ -170,8 +170,14 @@ void AsyncScanEngine::ScanSubtree(size_t workerIndex, CFolder* folder, std::wstr
 			ui64 actualsize = (ui64)SM_GetLogicalFileSize(&sizeinfo);
 			ui64 size = (ui64)SM_ChooseDisplayedFileSize(&sizeinfo, m_clusterMask, m_aligned);
 
-			if (!folder->AddFileWithArena(*m_workerArenas[workerIndex], finddata.cFileName,
-					(ui32)wcslen(finddata.cFileName), size, actualsize, *(ui64 *)&finddata.ftLastWriteTime)) {
+			BOOL added;
+			{
+				std::lock_guard<std::mutex> lock(m_treeMutex);
+				added = folder->AddFileWithArena(*m_workerArenas[workerIndex], finddata.cFileName,
+					(ui32)wcslen(finddata.cFileName), size, actualsize, *(ui64 *)&finddata.ftLastWriteTime);
+			}
+
+			if (!added) {
 				// Out of memory: abort the whole scan instead of silently dropping entries.
 				Abort();
 			} else {
@@ -204,8 +210,14 @@ void AsyncScanEngine::ScanSubtree(size_t workerIndex, CFolder* folder, std::wstr
 		if (m_cancelled.load()) break;
 
 		CFolder *child = new CFolder;
-		if (!folder->AddFolderWithArena(*m_workerArenas[workerIndex], dir.name.c_str(),
-				(ui32)dir.name.length(), child, dir.writeTime)) {
+		BOOL added;
+		{
+			std::lock_guard<std::mutex> lock(m_treeMutex);
+			added = folder->AddFolderWithArena(*m_workerArenas[workerIndex], dir.name.c_str(),
+				(ui32)dir.name.length(), child, dir.writeTime);
+		}
+
+		if (!added) {
 			// Out of memory: abort the whole scan instead of silently dropping the subtree.
 			delete child;
 			Abort();
@@ -351,10 +363,111 @@ bool AsyncScanEngine::IsCancelled() const
 
 CFolder* AsyncScanEngine::DetachResult(CStringArena& targetArena)
 {
+	std::lock_guard<std::mutex> lock(m_treeMutex);
 	if (m_cancelled.load() || m_rootFolder == nullptr) return nullptr;
 
 	targetArena.Merge(m_rootArena);
 	CFolder* result = m_rootFolder;
 	m_rootFolder = nullptr;
 	return result;
+}
+
+void AsyncScanEngine::GenerateLiveLayout(
+	int w, int h,
+	ui64 totalDiskSpace,
+	ui64 freeDiskSpace,
+	const TreemapConfig& config,
+	std::vector<TreemapNode>& outNodes)
+{
+	outNodes.clear();
+	if (w <= 0 || h <= 0) return;
+
+	std::lock_guard<std::mutex> lock(m_treeMutex);
+	if (m_rootFolder == nullptr || m_cancelled.load()) return;
+
+	unsigned int rootCount = m_rootFolder->cur;
+	if (rootCount == 0 && totalDiskSpace == 0) return;
+
+	// Calculate scanned and remaining bytes
+	ui64 scannedBytes = m_bytesScanned.load(std::memory_order_relaxed);
+	ui64 remainingBytes = 0;
+	if (totalDiskSpace > freeDiskSpace + scannedBytes) {
+		remainingBytes = totalDiskSpace - freeDiskSpace - scannedBytes;
+	}
+
+	unsigned int extraItems = 0;
+	if (freeDiskSpace > 0 && config.showFreeSpace) extraItems++;
+	if (remainingBytes > 0) extraItems++;
+
+	unsigned int totalItems = rootCount + extraItems;
+	if (totalItems == 0) return;
+
+	CFolder liveRoot;
+	liveRoot.names = new (std::nothrow) wchar_t*[totalItems];
+	liveRoot.children = new (std::nothrow) CFolder*[totalItems];
+	liveRoot.sizes = new (std::nothrow) ui64[totalItems];
+	liveRoot.actualsizes = new (std::nothrow) ui64[totalItems];
+	liveRoot.times = new (std::nothrow) ui64[totalItems];
+
+	if (!liveRoot.names || !liveRoot.children || !liveRoot.sizes || !liveRoot.actualsizes || !liveRoot.times) {
+		delete[] liveRoot.names;
+		delete[] liveRoot.children;
+		delete[] liveRoot.sizes;
+		delete[] liveRoot.actualsizes;
+		delete[] liveRoot.times;
+		return;
+	}
+
+	liveRoot.cur = 0;
+	liveRoot.max = totalItems;
+
+	for (unsigned int i = 0; i < rootCount; ++i) {
+		liveRoot.names[liveRoot.cur] = m_rootFolder->names[i];
+		liveRoot.children[liveRoot.cur] = m_rootFolder->children[i];
+		if (m_rootFolder->children[i] != nullptr) {
+			liveRoot.sizes[liveRoot.cur] = m_rootFolder->children[i]->SizeTotal();
+			liveRoot.actualsizes[liveRoot.cur] = m_rootFolder->children[i]->SizeTotal();
+		} else {
+			liveRoot.sizes[liveRoot.cur] = m_rootFolder->sizes[i];
+			liveRoot.actualsizes[liveRoot.cur] = m_rootFolder->actualsizes[i];
+		}
+		liveRoot.times[liveRoot.cur] = m_rootFolder->times[i];
+		liveRoot.cur++;
+	}
+
+	if (freeDiskSpace > 0 && config.showFreeSpace) {
+		static const wchar_t freeName[] = L"<Free Space>";
+		liveRoot.names[liveRoot.cur] = const_cast<wchar_t*>(freeName);
+		liveRoot.children[liveRoot.cur] = nullptr;
+		liveRoot.sizes[liveRoot.cur] = freeDiskSpace;
+		liveRoot.actualsizes[liveRoot.cur] = freeDiskSpace;
+		liveRoot.times[liveRoot.cur] = 0;
+		liveRoot.cur++;
+	}
+
+	if (remainingBytes > 0) {
+		static const wchar_t scanName[] = L"<Scanning...>";
+		liveRoot.names[liveRoot.cur] = const_cast<wchar_t*>(scanName);
+		liveRoot.children[liveRoot.cur] = nullptr;
+		liveRoot.sizes[liveRoot.cur] = remainingBytes;
+		liveRoot.actualsizes[liveRoot.cur] = remainingBytes;
+		liveRoot.times[liveRoot.cur] = 0;
+		liveRoot.cur++;
+	}
+
+	TreemapEngine::ComputeLayout(0, 0, w, h, &liveRoot, 0, config, outNodes);
+
+	// Cleanup without triggering CFolder recursive deletion
+	delete[] liveRoot.names;
+	delete[] liveRoot.sizes;
+	delete[] liveRoot.actualsizes;
+	delete[] liveRoot.times;
+	delete[] liveRoot.children;
+	liveRoot.names = nullptr;
+	liveRoot.children = nullptr;
+	liveRoot.sizes = nullptr;
+	liveRoot.actualsizes = nullptr;
+	liveRoot.times = nullptr;
+	liveRoot.cur = 0;
+	liveRoot.max = 0;
 }

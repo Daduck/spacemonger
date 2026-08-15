@@ -244,6 +244,56 @@ static int test_async_scan_is_scanning_loop_termination()
 	return 1;
 }
 
+static int test_concurrent_live_layout()
+{
+	std::wstring tempDir = CreateTempTestDirectory();
+	for (int i = 0; i < 40; ++i) {
+		std::wstring sub = tempDir + L"\\dir" + std::to_wstring(i);
+		CreateDirectoryW(sub.c_str(), NULL);
+		for (int j = 0; j < 5; ++j) {
+			CreateDummyFile(sub + L"\\file" + std::to_wstring(j) + L".txt", 100 + i * 10);
+		}
+	}
+
+	AsyncScanEngine engine;
+	std::wstring preparedPath = PathUtil::PrepareLongPath(tempDir);
+	preparedPath = PathUtil::EnsureTrailingBackslash(preparedPath);
+
+	CHECK(engine.StartScan(preparedPath, 0, false, 4));
+
+	TreemapConfig config;
+	std::vector<TreemapNode> nodes;
+	int liveLayoutCalls = 0;
+
+	while (engine.IsScanning()) {
+		engine.GenerateLiveLayout(800, 600, 5000000, 1000000, config, nodes);
+		liveLayoutCalls++;
+		if (!nodes.empty()) {
+			for (const auto& n : nodes) {
+				CHECK(n.w > 0 && n.h > 0);
+				CHECK(n.x >= 0 && n.y >= 0);
+			}
+		}
+		Sleep(2);
+	}
+
+	engine.WaitForCompletion();
+	CHECK(!engine.IsCancelled());
+	CHECK(liveLayoutCalls > 0);
+
+	// Final live layout call after scan completion
+	engine.GenerateLiveLayout(800, 600, 5000000, 1000000, config, nodes);
+	CHECK(!nodes.empty());
+
+	CStringArena targetArena;
+	CFolder* root = engine.DetachResult(targetArena);
+	CHECK(root != NULL);
+	delete root;
+
+	DeleteTestDirectory(tempDir);
+	return 1;
+}
+
 int main()
 {
 	if (!test_async_scan_directory_tree()) return 1;
@@ -251,6 +301,7 @@ int main()
 	if (!test_async_scan_rescan_after_cancel()) return 1;
 	if (!test_async_scan_repeated_shutdown_stress()) return 1;
 	if (!test_async_scan_is_scanning_loop_termination()) return 1;
+	if (!test_concurrent_live_layout()) return 1;
 	printf("AsyncScan_test passed successfully.\n");
 	return 0;
 }

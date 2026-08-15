@@ -148,6 +148,8 @@ add_executable(AsyncScan_test
   tests/AsyncScan_test.cpp
   AsyncScanEngine.cpp
   AsyncScanEngine.h
+  TreemapLayout.cpp
+  TreemapLayout.h
   DiskUsage.cpp
   DiskUsage.h
   PathUtil.cpp

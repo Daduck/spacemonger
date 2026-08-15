@@ -16,6 +16,7 @@
 #include <memory>
 #include "e.h"
 #include "StringArena.h"
+#include "TreemapLayout.h"
 
 #ifdef bool
 #pragma pop_macro("bool")
@@ -52,6 +53,14 @@ public:
 	bool IsCancelled() const;
 
 	CFolder* DetachResult(CStringArena& targetArena);
+
+	void GenerateLiveLayout(
+		int w, int h,
+		ui64 totalDiskSpace,
+		ui64 freeDiskSpace,
+		const TreemapConfig& config,
+		std::vector<TreemapNode>& outNodes
+	);
 
 private:
 	void WorkerThread(size_t workerIndex);
@@ -91,6 +100,8 @@ private:
 
 	mutable std::mutex m_pathMutex;
 	std::wstring m_latestPath;
+
+	mutable std::mutex m_treeMutex;
 
 	CFolder* m_rootFolder{nullptr};
 	CStringArena m_rootArena;
