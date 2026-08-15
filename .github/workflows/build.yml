@@ -28,3 +28,11 @@ jobs:
     - name: Test (x86 / x64)
       if: matrix.preset != 'vs2022-arm64'
       run: ctest --preset ${{ matrix.preset }}-${{ matrix.configuration == 'Debug' && 'debug' || 'release' }}
+
+    - name: Upload release executable
+      if: matrix.configuration == 'Release'
+      uses: actions/upload-artifact@v4
+      with:
+        name: SpaceMonger-${{ matrix.preset }}
+        path: build/${{ matrix.preset }}/Release/SpaceMonger.exe
+        if-no-files-found: error
