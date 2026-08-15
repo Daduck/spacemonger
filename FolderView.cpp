@@ -668,8 +668,7 @@ void CFolderView::OnDraw(CDC *pDC)
 	pDC->RealizePalette();
 
 	DrawBox(pDC->m_hDC, ColorFlat, 0, 0, m_width, m_height);
-	if (m_layoutNodes.empty())
-		FillBox(pDC->m_hDC, ColorFlat, 1, 1, m_width-2, m_height-2);
+	FillBox(pDC->m_hDC, ColorFlat, 1, 1, m_width-2, m_height-2);
 
 	for (const auto &cur : m_layoutNodes) {
 		MinimalDrawDisplayFolder(pDC, &cur, selected == &cur);
@@ -734,6 +733,9 @@ void CFolderView::MinimalDrawDisplayFolder(CDC *pDC, const TreemapNode *cur, BOO
 		if (cur->flags & 1) {
 			DrawBox(pDC->m_hDC, brush, x + 2, y + 2, w - 4, h - 4);
 			FillBox(pDC->m_hDC, brush, x + 3, y + 3, w - 6, 9);
+			if (h > 15 && w > 6) {
+				FillBox(pDC->m_hDC, ColorFlat, x + 3, y + 12, w - 6, h - 15);
+			}
 		}
 		else FillBox(pDC->m_hDC, brush, x + 2, y + 2, w - 4, h - 4);
 	}

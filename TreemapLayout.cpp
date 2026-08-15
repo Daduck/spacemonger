@@ -147,12 +147,12 @@ static void SizeFolders(
 					ComputeLayoutInternal(x1 + 3, y1 + 12, w1 - 6, h1 - 15,
 						folder->children[index[0]], depth + 1, config, hmin, vmin, outNodes);
 				} else {
-					AddNode(outNodes, folder, (ui32)-1, depth + 1,
-						(si16)(x2 + 3), (si16)(y2 + 12), (si16)(w2 - 6), (si16)(h2 - 15), TREEMAP_FLAG_NONE);
+					AddNode(outNodes, folder, (ui32)-1, -1,
+						(si16)(x1 + 3), (si16)(y1 + 12), (si16)(w1 - 6), (si16)(h1 - 15), TREEMAP_FLAG_NONE);
 				}
 			}
 		} else {
-			AddNode(outNodes, folder, (ui32)-1, depth, (si16)x1, (si16)y1, (si16)w1, (si16)h1, TREEMAP_FLAG_NONE);
+			AddNode(outNodes, folder, (ui32)-1, -1, (si16)x1, (si16)y1, (si16)w1, (si16)h1, TREEMAP_FLAG_NONE);
 		}
 	}
 
@@ -169,12 +169,12 @@ static void SizeFolders(
 					ComputeLayoutInternal(x2 + 3, y2 + 12, w2 - 6, h2 - 15,
 						folder->children[index[numlist1]], depth + 1, config, hmin, vmin, outNodes);
 				} else {
-					AddNode(outNodes, folder, (ui32)-1, depth + 1,
+					AddNode(outNodes, folder, (ui32)-1, -1,
 						(si16)(x2 + 3), (si16)(y2 + 12), (si16)(w2 - 6), (si16)(h2 - 15), TREEMAP_FLAG_NONE);
 				}
 			}
 		} else {
-			AddNode(outNodes, folder, (ui32)-1, depth, (si16)x2, (si16)y2, (si16)w2, (si16)h2, TREEMAP_FLAG_NONE);
+			AddNode(outNodes, folder, (ui32)-1, -1, (si16)x2, (si16)y2, (si16)w2, (si16)h2, TREEMAP_FLAG_NONE);
 		}
 	}
 }
