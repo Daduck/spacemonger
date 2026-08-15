@@ -104,6 +104,8 @@ BEGIN_MESSAGE_MAP(CFolderView, CFreeView)
 	ON_WM_CREATE()
 	ON_WM_DESTROY()
 	ON_WM_MOUSEMOVE()
+	ON_WM_ERASEBKGND()
+	ON_WM_PAINT()
 	//}}AFX_MSG_MAP
 	ON_UPDATE_COMMAND_UI_RANGE(100, 41000, OnIgnoreUpdate)
 END_MESSAGE_MAP()
@@ -807,6 +809,33 @@ void CFolderView::MinimalDrawDisplayFolder(CDC *pDC, const TreemapNode *cur, BOO
 	}
 }
 
+BOOL CFolderView::OnEraseBkgnd(CDC* pDC)
+{
+	// Suppress background erasing to prevent flicker (we paint entire client area)
+	return TRUE;
+}
+
+void CFolderView::OnPaint()
+{
+	CPaintDC dc(this);
+	CRect rect;
+	GetClientRect(&rect);
+	int w = rect.Width();
+	int h = rect.Height();
+	if (w <= 0 || h <= 0) return;
+
+	CDC memDC;
+	memDC.CreateCompatibleDC(&dc);
+	CBitmap bitmap;
+	bitmap.CreateCompatibleBitmap(&dc, w, h);
+	CBitmap *oldBitmap = memDC.SelectObject(&bitmap);
+
+	OnDraw(&memDC);
+
+	dc.BitBlt(0, 0, w, h, &memDC, 0, 0, SRCCOPY);
+	memDC.SelectObject(oldBitmap);
+}
+
 void CFolderView::UpdateLiveScanLayout(AsyncScanEngine& engine, ui64 totalspace, ui64 freespace)
 {
 	CRect rect;
@@ -827,11 +856,18 @@ void CFolderView::UpdateLiveScanLayout(AsyncScanEngine& engine, ui64 totalspace,
 
 	engine.GenerateLiveLayout(m_width - 1, m_height - 1, totalspace, freespace, config, m_layoutNodes);
 
-	CDC *dc = GetDC();
-	if (dc != NULL) {
-		OnDraw(dc);
-		ReleaseDC(dc);
-	}
+	// Off-screen double buffer blit directly to screen DC with zero flicker
+	CClientDC dc(this);
+	CDC memDC;
+	memDC.CreateCompatibleDC(&dc);
+	CBitmap bitmap;
+	bitmap.CreateCompatibleBitmap(&dc, m_width, m_height);
+	CBitmap *oldBitmap = memDC.SelectObject(&bitmap);
+
+	OnDraw(&memDC);
+
+	dc.BitBlt(0, 0, m_width, m_height, &memDC, 0, 0, SRCCOPY);
+	memDC.SelectObject(oldBitmap);
 }
 
 void CFolderView::SetDocument(CFreeDoc *doc)
