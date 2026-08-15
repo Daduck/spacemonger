@@ -13,7 +13,7 @@ much space every file and folder are using.
 
 The latest version of SpaceMonger is always available at its web page:
 
-    http://www.werkema.com/software/spacemonger.html
+    https://andedammen.dk/spacemonger
 
 
 SYSTEM REQUIREMENTS
@@ -107,9 +107,18 @@ users of the program to give away copies to their friends.
 WHAT'S NEW
 ----------
 
-Between 1.4.2 and 1.4.3 (Multithreaded Scanner)
+Between 1.4.2 and 1.4.3 (Multithreaded Scanner & Live Treemap)
    * New multithreaded scan engine that spreads directory scanning across
      CPU cores, dramatically speeding up scans of large drives.
+   * The treemap now builds live on screen while a scan is running, so
+     you can watch the map take shape in real time instead of staring
+     at a progress bar.
+   * All treemap rendering is now double-buffered, eliminating flicker
+     during scans, window resizing, selection, and mouse rollover.
+   * Smoother and more truthful scan progress bar.
+   * The treemap layout engine was extracted into a standalone,
+     unit-tested module, making layout behavior verifiable for tricky
+     geometries and degenerate window sizes.
    * Fixed an intermittent race condition that could make a scan hang
      forever just as it finished.
    * Fixed cloud-placeholder folders (OneDrive, Dropbox, Google Drive)
@@ -203,7 +212,11 @@ COPYRIGHT AND CONTACT INFORMATION
 ---------------------------------
 
 SpaceMonger is Copyright (C) 1998, 1999, and 2000 by Sean Werkema.
-Have questions?  Found a bug?  Want a feature?	Compose your thoughts in
-an e-mail and send them to sean@werkema.com.  I should be able to respond
-within a few days of your message.
+Modernized and maintained since 2026 by Johnny J. Andersen.
+
+Questions, bug reports, and feature requests for the modernized
+releases are welcome at:
+
+    https://andedammen.dk/spacemonger
+    https://github.com/Daduck/spacemonger
 

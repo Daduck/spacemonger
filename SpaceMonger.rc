@@ -293,12 +293,12 @@ BEGIN
     BEGIN
         BLOCK "040904b0"
         BEGIN
-            VALUE "Comments", "Visit http://www.werkema.com/software/spacemonger.html for the latest version\0"
+            VALUE "Comments", "Visit https://andedammen.dk/spacemonger for the latest version\0"
             VALUE "CompanyName", "65 Systems\0"
             VALUE "FileDescription", "SpaceMonger Program File\0"
             VALUE "FileVersion", "1, 4, 3, 0\0"
             VALUE "InternalName", "SpaceMonger\0"
-            VALUE "LegalCopyright", "Copyright (C) 1997-2000 Sean Werkema\0"
+            VALUE "LegalCopyright", "Copyright (C) 1997-2000 Sean Werkema, (C) 2026 Johnny J. Andersen\0"
             VALUE "LegalTrademarks", "\0"
             VALUE "OriginalFilename", "SpaceMonger.exe\0"
             VALUE "PrivateBuild", "\0"
