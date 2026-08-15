@@ -5,6 +5,7 @@
 #include "AsyncScanEngine.h"
 #include "PathUtil.h"
 #include "Lang.h"
+#include <cmath>
 
 CFolderTree::CFolderTree()
 {
@@ -293,11 +294,19 @@ void CFolderDialog::UpdateFromProgress(const ScanProgress& progress, ui64 usedsp
 
 	CProgressCtrl *ctrl = (CProgressCtrl *)GetDlgItem(IDC_LOAD_PROGRESS);
 	if (ctrl != NULL) {
-		ui64 fspace = progress.bytesScanned / 16384;
-		ui64 uspace = usedspace / 16384;
-		if (uspace <= 0) uspace = 1;
-		int pos = (int)(fspace * 4096 / uspace);
-		if (pos > 4096) pos = 4096;
+		int pos = 0;
+		if (progress.isComplete) {
+			pos = 4096;
+		} else if (usedspace > 0 && progress.bytesScanned > 0) {
+			double ratio = (double)progress.bytesScanned / (double)usedspace;
+			if (ratio > 1.0) ratio = 1.0;
+			if (ratio < 0.0) ratio = 0.0;
+			// Use a perceptual power curve (ratio^1.5) to prevent front-loaded large files
+			// from prematurely filling the progress bar before directory walking completes
+			double smoothed = pow(ratio, 1.5);
+			pos = (int)(smoothed * 4000.0);
+			if (pos > 4000) pos = 4000;
+		}
 		ctrl->SetPos(pos);
 	}
 

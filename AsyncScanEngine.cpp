@@ -407,15 +407,8 @@ void AsyncScanEngine::GenerateLiveLayout(
 	unsigned int rootCount = m_rootFolder->cur;
 	if (rootCount == 0 && totalDiskSpace == 0) return;
 
-	// Calculate scanned and remaining bytes
-	ui64 remainingBytes = 0;
-	if (totalDiskSpace > freeDiskSpace + scannedBytes) {
-		remainingBytes = totalDiskSpace - freeDiskSpace - scannedBytes;
-	}
-
 	unsigned int extraItems = 0;
 	if (freeDiskSpace > 0 && config.showFreeSpace) extraItems++;
-	if (remainingBytes > 0) extraItems++;
 
 	unsigned int totalItems = rootCount + extraItems;
 	if (totalItems == 0) return;
@@ -454,16 +447,6 @@ void AsyncScanEngine::GenerateLiveLayout(
 		liveRoot.children[liveRoot.cur] = nullptr;
 		liveRoot.sizes[liveRoot.cur] = freeDiskSpace;
 		liveRoot.actualsizes[liveRoot.cur] = freeDiskSpace;
-		liveRoot.times[liveRoot.cur] = 0;
-		liveRoot.cur++;
-	}
-
-	if (remainingBytes > 0) {
-		static const wchar_t scanName[] = L"<Scanning...>";
-		liveRoot.names[liveRoot.cur] = const_cast<wchar_t*>(scanName);
-		liveRoot.children[liveRoot.cur] = nullptr;
-		liveRoot.sizes[liveRoot.cur] = remainingBytes;
-		liveRoot.actualsizes[liveRoot.cur] = remainingBytes;
 		liveRoot.times[liveRoot.cur] = 0;
 		liveRoot.cur++;
 	}

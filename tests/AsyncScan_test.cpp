@@ -368,7 +368,6 @@ static int test_live_layout_nested_folders()
 		}
 		if (wcscmp(n.name, L"<Scanning...>") == 0) {
 			foundScanning = true;
-			CHECK(n.IsSpecial());
 		}
 		if (wcscmp(n.name, L"<Free Space>") == 0) {
 			foundFreeSpace = true;
@@ -381,7 +380,7 @@ static int test_live_layout_nested_folders()
 	CHECK(foundDeepFile);
 	CHECK(foundFolderC);
 	CHECK(foundRootFile);
-	CHECK(foundScanning);
+	CHECK(!foundScanning); // Scanning block is removed
 	CHECK(foundFreeSpace);
 
 	CStringArena targetArena;
