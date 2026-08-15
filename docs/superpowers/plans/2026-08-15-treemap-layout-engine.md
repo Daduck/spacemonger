@@ -30,15 +30,15 @@
   - `struct TreemapConfig`
   - `class TreemapEngine` with declarations for `ComputeLayout`, `GetMinDimensions`, `HitTestItem`, `HitTestContainer`
 
-- [ ] **Step 1: Create `TreemapLayout.h`**
+- [x] **Step 1: Create `TreemapLayout.h`**
 
 Define `TreemapNode`, `TreemapConfig`, and `TreemapEngine`.
 
-- [ ] **Step 2: Create initial `TreemapLayout.cpp` with `GetMinDimensions`**
+- [x] **Step 2: Create initial `TreemapLayout.cpp` with `GetMinDimensions`**
 
 Implement `TreemapEngine::GetMinDimensions(int density, int dpi, int &outHMin, int &outVMin)` using `MulDiv` and the standard minimum sizes lookup table.
 
-- [ ] **Step 3: Commit initial files**
+- [x] **Step 3: Commit initial files**
 
 ```bash
 git add TreemapLayout.h TreemapLayout.cpp
@@ -60,15 +60,15 @@ git commit -m "feat: introduce TreemapLayout module scaffolding"
   - `TreemapEngine::HitTestItem(...)`
   - `TreemapEngine::HitTestContainer(...)`
 
-- [ ] **Step 1: Implement `ComputeLayout` and internal `SizeFolders`**
+- [x] **Step 1: Implement `ComputeLayout` and internal `SizeFolders`**
 
 Extract and adapt the greedy 2-way split, bias aspect-ratio comparison, and recursive subdivision into `TreemapEngine`.
 
-- [ ] **Step 2: Implement `HitTestItem` and `HitTestContainer`**
+- [x] **Step 2: Implement `HitTestItem` and `HitTestContainer`**
 
 Implement coordinate hit-testing against `const std::vector<TreemapNode>&` respecting folder border margins and placeholder nodes.
 
-- [ ] **Step 3: Commit implementation**
+- [x] **Step 3: Commit implementation**
 
 ```bash
 git add TreemapLayout.h TreemapLayout.cpp
@@ -87,7 +87,7 @@ git commit -m "feat: implement treemap partitioning and hit-testing engine"
 - Consumes: `TreemapEngine`, `TreemapNode`, `TreemapConfig`, `CFolder`, `CStringArena`
 - Produces: Test binary `Treemap_test` registered in CTest
 
-- [ ] **Step 1: Write comprehensive test cases in `tests/Treemap_test.cpp`**
+- [x] **Step 1: Write comprehensive test cases in `tests/Treemap_test.cpp`**
 
 Test scenarios:
 1. `NullAndEmptyFolder`: `nullptr` or 0 entries produces empty node vector.
@@ -99,13 +99,13 @@ Test scenarios:
 7. `DegenerateGeometries`: Zero-byte items, $0 \times 0$ box, $10000 \times 1$ and $1 \times 10000$ aspect ratios.
 8. `HitTestingValidation`: Exact hit testing for files, folder headers, inside folder interiors, and container lookup.
 
-- [ ] **Step 2: Add `Treemap_test` target to `CMakeLists.txt`**
+- [x] **Step 2: Add `Treemap_test` target to `CMakeLists.txt`**
 
 Add `Treemap_test` executable with `TreemapLayout.cpp`, `Folder.cpp`, `FolderEntryArrays.cpp`, `PathUtil.cpp`, `DiskUsage.cpp`.
 
-- [ ] **Step 3: Run `ctest --preset vs2022-x64-release` and verify all tests pass**
+- [x] **Step 3: Run `ctest --preset vs2022-x64-release` and verify all tests pass**
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add tests/Treemap_test.cpp CMakeLists.txt
@@ -125,12 +125,12 @@ git commit -m "test: add Treemap_test test suite and register in CMakeLists.txt"
 - Consumes: `TreemapEngine`, `TreemapNode`, `TreemapConfig`
 - Produces: Updated `CFolderView` using `std::vector<TreemapNode> m_layoutNodes`
 
-- [ ] **Step 1: Update `FolderView.h`**
+- [x] **Step 1: Update `FolderView.h`**
 
 Replace `CDisplayFolder` linked list with `std::vector<TreemapNode> m_layoutNodes; const TreemapNode *m_selectedNode; const TreemapNode *m_hoverNode;`.
 Remove obsolete private methods `BuildFolderLayout`, `SizeFolders`, `AddDisplayFolder`, `ClearDisplayFolders`.
 
-- [ ] **Step 2: Update `FolderView.cpp`**
+- [x] **Step 2: Update `FolderView.cpp`**
 
 - Include `TreemapLayout.h`.
 - In `OnSize`: construct `TreemapConfig` and call `TreemapEngine::ComputeLayout(...)`.
@@ -139,9 +139,9 @@ Remove obsolete private methods `BuildFolderLayout`, `SizeFolders`, `AddDisplayF
 - In `MinimalDrawDisplayFolder`, `SelectFolder`, `ZoomIn`, `HighlightPathAtPoint`, tooltips: adapt from `CDisplayFolder*` to `TreemapNode` / `const TreemapNode*`.
 - Update `CMakeLists.txt` to include `TreemapLayout.cpp` in `SPACEMONGER_SOURCES`.
 
-- [ ] **Step 3: Build `SpaceMonger` and run all tests**
+- [x] **Step 3: Build `SpaceMonger` and run all tests**
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add FolderView.h FolderView.cpp CMakeLists.txt
@@ -155,15 +155,15 @@ git commit -m "refactor: integrate pure TreemapEngine into CFolderView and elimi
 **Files:**
 - Modify: `BACKLOG.md:24-34`
 
-- [ ] **Step 1: Run full test suite across presets**
+- [x] **Step 1: Run full test suite across presets**
 
 Run `ctest --preset vs2022-x64-release` and `ctest --preset vs2022-win32-release` to verify 100% pass rate.
 
-- [ ] **Step 2: Mark task complete in `BACKLOG.md`**
+- [x] **Step 2: Mark task complete in `BACKLOG.md`**
 
 Mark "Extract Treemap Layout Engine into a Pure Module" as completed (`[x]`).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add BACKLOG.md

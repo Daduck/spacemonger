@@ -265,6 +265,93 @@ static int test_hit_testing_leaf_and_container()
 	return 1;
 }
 
+static int test_multi_level_nesting()
+{
+	CStringArena arena;
+	CFolder *level2 = new CFolder;
+	level2->AddFileWithArena(arena, L"deep.dat", 8, 200, 200, 0);
+
+	CFolder *level1 = new CFolder;
+	level1->AddFolderWithArena(arena, L"Level2", 6, level2, 0);
+
+	CFolder root;
+	root.AddFolderWithArena(arena, L"Level1", 6, level1, 0);
+	root.Finalize();
+
+	std::vector<TreemapNode> nodes;
+	TreemapConfig config;
+	TreemapEngine::ComputeLayout(0, 0, 800, 600, &root, 0, config, nodes);
+
+	// Expect 3 nodes: Level1 (depth 0), Level2 (depth 1), deep.dat (depth 2)
+	CHECK(nodes.size() == 3);
+	CHECK(nodes[0].depth == 0 && nodes[0].IsFolder() && wcscmp(nodes[0].name, L"Level1") == 0);
+	CHECK(nodes[1].depth == 1 && nodes[1].IsFolder() && wcscmp(nodes[1].name, L"Level2") == 0);
+	CHECK(nodes[2].depth == 2 && !nodes[2].IsFolder() && wcscmp(nodes[2].name, L"deep.dat") == 0);
+
+	// Check cumulative margin nesting:
+	// Level 1: (0, 0, 800, 600)
+	// Level 2: (3, 12, 794, 585)
+	// deep.dat: (3+3, 12+12, 794-6, 585-15) = (6, 24, 788, 570)
+	CHECK(nodes[1].x == 3 && nodes[1].y == 12 && nodes[1].w == 794 && nodes[1].h == 585);
+	CHECK(nodes[2].x == 6 && nodes[2].y == 24 && nodes[2].w == 788 && nodes[2].h == 570);
+
+	return 1;
+}
+
+static int test_multi_file_greedy_partition()
+{
+	CStringArena arena;
+	CFolder root;
+	// 400 + 100 = 500; 300 + 200 = 500 (perfect balance)
+	root.AddFileWithArena(arena, L"f400.txt", 8, 400, 400, 0);
+	root.AddFileWithArena(arena, L"f300.txt", 8, 300, 300, 0);
+	root.AddFileWithArena(arena, L"f200.txt", 8, 200, 200, 0);
+	root.AddFileWithArena(arena, L"f100.txt", 8, 100, 100, 0);
+	root.Finalize();
+
+	std::vector<TreemapNode> nodes;
+	TreemapConfig config;
+	TreemapEngine::ComputeLayout(0, 0, 800, 400, &root, 0, config, nodes);
+
+	CHECK(nodes.size() == 4);
+	for (const auto &n : nodes) {
+		CHECK(n.w > 0 && n.h > 0);
+		CHECK(n.x >= 0 && n.y >= 0);
+		CHECK(n.x + n.w <= 800);
+		CHECK(n.y + n.h <= 400);
+	}
+
+	return 1;
+}
+
+static int test_extreme_bias_and_density_filtering()
+{
+	CStringArena arena;
+	CFolder root;
+	root.AddFileWithArena(arena, L"f1.txt", 6, 500, 500, 0);
+	root.AddFileWithArena(arena, L"f2.txt", 6, 500, 500, 0);
+	root.Finalize();
+
+	// Extreme positive bias (+8) on a square box (400x400) forces horizontal split (splits width)
+	TreemapConfig config;
+	config.bias = 8;
+	std::vector<TreemapNode> nodes;
+	TreemapEngine::ComputeLayout(0, 0, 400, 400, &root, 0, config, nodes);
+	CHECK(nodes.size() == 2);
+	CHECK(nodes[0].w == 200 && nodes[0].h == 400);
+	CHECK(nodes[1].w == 200 && nodes[1].h == 400);
+
+	// Extreme negative bias (-8) on a square box (400x400) forces vertical split (splits height)
+	config.bias = -8;
+	nodes.clear();
+	TreemapEngine::ComputeLayout(0, 0, 400, 400, &root, 0, config, nodes);
+	CHECK(nodes.size() == 2);
+	CHECK(nodes[0].w == 400 && nodes[0].h == 200);
+	CHECK(nodes[1].w == 400 && nodes[1].h == 200);
+
+	return 1;
+}
+
 int main()
 {
 	if (!test_null_and_empty_folder()) return 1;
@@ -275,6 +362,9 @@ int main()
 	if (!test_free_space_visibility()) return 1;
 	if (!test_degenerate_geometries()) return 1;
 	if (!test_hit_testing_leaf_and_container()) return 1;
+	if (!test_multi_level_nesting()) return 1;
+	if (!test_multi_file_greedy_partition()) return 1;
+	if (!test_extreme_bias_and_density_filtering()) return 1;
 
 	printf("Treemap_test passed successfully.\n");
 	return 0;
