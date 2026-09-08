@@ -112,8 +112,9 @@ BOOL CFolderTree::LoadTree(const CString &path, BOOL includespace, CWnd *modalwi
 	}
 
 	engine.WaitForCompletion();
+	ScanProgress resultProgress = engine.GetProgress();
 
-	if (dialog.cancelled || engine.IsCancelled()) {
+	if (dialog.cancelled || engine.IsCancelled() || resultProgress.isFailed) {
 		// The view may still show the last live-scan frame; drop it so a
 		// dead scan's half-built map doesn't linger on screen.
 		CFolderView *fv = (CFolderView *)theApp.m_view;
@@ -126,6 +127,11 @@ BOOL CFolderTree::LoadTree(const CString &path, BOOL includespace, CWnd *modalwi
 		freespace = usedspace = totalspace = 0;
 		m_path = "";
 		dialog.DestroyWindow();
+		if (resultProgress.isFailed) {
+			CString message;
+			message.Format(CurLang->scan_failed_format, resultProgress.firstError);
+			AfxMessageBox(message, MB_OK | MB_ICONEXCLAMATION);
+		}
 		return 0;
 	}
 
@@ -160,6 +166,12 @@ BOOL CFolderTree::LoadTree(const CString &path, BOOL includespace, CWnd *modalwi
 
 	root->Finalize();
 	dialog.DestroyWindow();
+	if (resultProgress.isPartial) {
+		CString message;
+		message.Format(CurLang->scan_partial_format,
+			resultProgress.skippedDirectories, resultProgress.firstError);
+		AfxMessageBox(message, MB_OK | MB_ICONEXCLAMATION);
+	}
 
 	if (modalwin != NULL && ::IsWindow(modalwin->m_hWnd)) {
 		modalwin->SetWindowPos(&CWnd::wndTop, 0, 0, 0, 0, SWP_NOMOVE|SWP_NOSIZE);

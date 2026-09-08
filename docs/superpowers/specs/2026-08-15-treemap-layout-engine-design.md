@@ -1,5 +1,10 @@
 # Treemap Layout Engine Pure Module Extraction Design
 
+> **Implementation status (2026-09-08):** Completed. The extraction description
+> below records the pre-extraction design. TreemapLayout now owns layout and
+> hit testing; CFolderView handles drawing. CMake explicitly selects C++17.
+
+
 **Author:** Antigravity  
 **Date:** 2026-08-15  
 **Status:** Approved  

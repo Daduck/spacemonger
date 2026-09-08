@@ -29,11 +29,9 @@ has more than enough memory and CPU power to run SpaceMonger efficiently.
 INSTALLATION
 ------------
 
-Unpack the .ZIP archive.  A single Windows executable will be produced,
-named "SpaceMonger.exe", along with "README.TXT", which is what you're
-reading now.  The "SpaceMonger.exe" file is the complete program, and it
-can be moved into any folder you like.	(We recommend "C:\Program Files",
-but you don't have to put it there.)
+Download the standalone SpaceMonger.exe for your Windows architecture.
+No installer, archive, or accompanying files are required. Save the executable
+in a folder of your choice. Release notes are available on the website.
 
 Double-click on it to run it.
 
@@ -44,6 +42,12 @@ KNOWN LIMITATIONS
 SpaceMonger is designed for extreme scanning speed. Because of this, it relies on fast directory-index queries rather than opening individual files.
 
 As a trade-off, SpaceMonger does not track Windows Hard Links. If a file is hard-linked in multiple directories, it will appear as a full copy in each location, and its disk space will be over-counted. Directory Junctions, Symlinks, Sparse Files, and Cloud Placeholders have dedicated handling to avoid known modern Windows scan and size-accounting problems.
+
+A failed root scan is reported as an error. If some directories cannot be
+fully enumerated (for example, access is denied or nesting exceeds the
+scanner's 128-level limit), the result is marked incomplete and its totals
+may be understated. Skipped-directory counts describe directly skipped or
+interrupted directories, not every descendant they may contain.
 
 
 FIRST-TIME INSTRUCTIONS

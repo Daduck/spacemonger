@@ -6,6 +6,27 @@
 #include <windows.h>
 #include <stdio.h>
 #include <string>
+#include <new>
+#include <cstdlib>
+#include <aclapi.h>
+#pragma comment(lib, "advapi32.lib")
+
+// Fail only allocations on the calling test thread, never worker allocations.
+static thread_local int allocationsBeforeFailure = -1;
+static thread_local bool allocationFailed = false;
+void* operator new(size_t size)
+{
+	if (allocationsBeforeFailure == 0) {
+		allocationsBeforeFailure = -1;
+		allocationFailed = true;
+		throw std::bad_alloc();
+	}
+	if (allocationsBeforeFailure > 0) --allocationsBeforeFailure;
+	if (void* result = std::malloc(size == 0 ? 1 : size)) return result;
+	throw std::bad_alloc();
+}
+void operator delete(void* p) noexcept { std::free(p); }
+void operator delete(void* p, size_t) noexcept { std::free(p); }
 
 #define CHECK(condition) \
 	do { \
@@ -530,8 +551,148 @@ static int test_live_layout_survives_engine_destruction()
 	return 1;
 }
 
+static int test_missing_scan_root_is_not_success()
+{
+	std::wstring tempDir = CreateTempTestDirectory();
+	AsyncScanEngine engine;
+	CHECK(engine.StartScan(tempDir + L"\\missing\\", 0, false, 2));
+	engine.WaitForCompletion();
+	CHECK(!engine.GetProgress().isComplete);
+	CHECK(engine.GetProgress().isFailed);
+	CHECK(!engine.GetProgress().isCancelled);
+	CHECK(engine.GetProgress().skippedDirectories == 1);
+	CHECK(engine.GetProgress().firstError != ERROR_SUCCESS);
+	CStringArena arena;
+	CFolder* root = engine.DetachResult(arena);
+	CHECK(root == nullptr);
+	CHECK(engine.StartScan(tempDir, 0, false, 2));
+	engine.WaitForCompletion();
+	CHECK(engine.GetProgress().isComplete);
+	CHECK(!engine.GetProgress().isFailed);
+	CHECK(engine.GetProgress().skippedDirectories == 0);
+	CHECK(engine.GetProgress().firstError == ERROR_SUCCESS);
+	DeleteTestDirectory(tempDir);
+	return 1;
+}
+
+static int test_live_layout_allocation_failures()
+{
+	std::wstring tempDir = CreateTempTestDirectory();
+	CreateDirectoryW((tempDir + L"\\child").c_str(), nullptr);
+	CreateDummyFile(tempDir + L"\\child\\file.txt", 100);
+	AsyncScanEngine engine;
+	CHECK(engine.StartScan(tempDir, 0, false, 2));
+	engine.WaitForCompletion();
+	int failures = 0;
+	bool completedSweep = false;
+	for (int failAt = 0; failAt < 100; ++failAt) {
+		std::vector<TreemapNode> nodes;
+		std::vector<std::wstring> names;
+		allocationFailed = false;
+		allocationsBeforeFailure = failAt;
+		bool escaped = false;
+		try { engine.GenerateLiveLayout(1024, 768, 1000, 100, TreemapConfig{}, nodes, names); }
+		catch (const std::bad_alloc&) { escaped = true; }
+		allocationsBeforeFailure = -1;
+		CHECK(!escaped);
+		if (!allocationFailed) { CHECK(!nodes.empty()); completedSweep = true; break; }
+		++failures;
+		CHECK(nodes.empty());
+		CHECK(names.empty());
+		// The borrowed snapshot must never delete the real subtree.
+		engine.GenerateLiveLayout(1024, 768, 1000, 100, TreemapConfig{}, nodes, names);
+		CHECK(!nodes.empty());
+	}
+	CHECK(failures >= 5);
+	CHECK(completedSweep);
+	CStringArena arena;
+	CFolder* root = engine.DetachResult(arena);
+	CHECK(root != nullptr && root->SizeTotal() == 100);
+	delete root;
+	DeleteTestDirectory(tempDir);
+	return 1;
+}
+
+static int test_empty_scan_root_is_success()
+{
+	std::wstring tempDir = CreateTempTestDirectory();
+	AsyncScanEngine engine;
+	CHECK(engine.StartScan(tempDir, 0, false, 2));
+	engine.WaitForCompletion();
+	CHECK(engine.GetProgress().isComplete);
+	CHECK(!engine.GetProgress().isPartial);
+	CHECK(!engine.GetProgress().isFailed);
+	DeleteTestDirectory(tempDir);
+	return 1;
+}
+
+static int test_depth_limit_reports_partial_scan()
+{
+	std::wstring tempDir = PathUtil::PrepareLongPath(CreateTempTestDirectory());
+	std::wstring path = tempDir;
+	for (int i = 0; i < 130; ++i) {
+		path += L"\\d";
+		CHECK(CreateDirectoryW(path.c_str(), nullptr));
+	}
+	CreateDummyFile(path + L"\\deep.txt", 100);
+	AsyncScanEngine engine;
+	CHECK(engine.StartScan(tempDir, 0, false, 2));
+	engine.WaitForCompletion();
+	auto p = engine.GetProgress();
+	CHECK(p.isPartial && !p.isComplete && !p.isFailed);
+	CHECK(p.skippedDirectories == 1 && p.firstError == ERROR_DIRECTORY);
+	CStringArena arena;
+	CFolder* root = engine.DetachResult(arena);
+	CHECK(root != nullptr);
+	delete root;
+	DeleteTestDirectory(tempDir);
+	return 1;
+}
+
+static int test_access_denied_reports_scan_status()
+{
+	std::wstring tempDir = CreateTempTestDirectory();
+	std::wstring blocked = tempDir + L"\\blocked";
+	CHECK(CreateDirectoryW(blocked.c_str(), nullptr));
+	CreateDummyFile(tempDir + L"\\visible.txt", 100);
+	ACL emptyAcl;
+	CHECK(InitializeAcl(&emptyAcl, sizeof(emptyAcl), ACL_REVISION));
+	CHECK(SetNamedSecurityInfoW(&blocked[0], SE_FILE_OBJECT,
+		DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
+		nullptr, nullptr, &emptyAcl, nullptr) == ERROR_SUCCESS);
+	// Restore access before assertions/cleanup, including unexpected exceptions.
+	struct RestoreAccess {
+		std::wstring& path;
+		~RestoreAccess() { SetNamedSecurityInfoW(&path[0], SE_FILE_OBJECT,
+			DACL_SECURITY_INFORMATION | UNPROTECTED_DACL_SECURITY_INFORMATION,
+			nullptr, nullptr, nullptr, nullptr); }
+	};
+	ScanProgress partial{}, failed{};
+	{
+		RestoreAccess restore{blocked};
+		AsyncScanEngine engine;
+		engine.StartScan(tempDir, 0, false, 2);
+		engine.WaitForCompletion();
+		partial = engine.GetProgress();
+		engine.StartScan(blocked, 0, false, 2);
+		engine.WaitForCompletion();
+		failed = engine.GetProgress();
+	}
+	DeleteTestDirectory(tempDir);
+	CHECK(partial.isPartial && !partial.isComplete && !partial.isFailed);
+	CHECK(partial.skippedDirectories == 1 && partial.firstError == ERROR_ACCESS_DENIED);
+	CHECK(failed.isFailed && !failed.isComplete && !failed.isCancelled);
+	CHECK(failed.firstError == ERROR_ACCESS_DENIED);
+	return 1;
+}
+
 int main()
 {
+	if (!test_missing_scan_root_is_not_success()) return 1;
+	if (!test_empty_scan_root_is_success()) return 1;
+	if (!test_live_layout_allocation_failures()) return 1;
+	if (!test_depth_limit_reports_partial_scan()) return 1;
+	if (!test_access_denied_reports_scan_status()) return 1;
 	if (!test_async_scan_directory_tree()) return 1;
 	if (!test_async_scan_cancellation()) return 1;
 	if (!test_async_scan_rescan_after_cancel()) return 1;

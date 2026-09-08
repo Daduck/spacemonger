@@ -43,6 +43,9 @@ bool AsyncScanEngine::StartScan(const std::wstring& rootPath, ui64 clusterMask, 
 	m_bytesScanned.store(0);
 	m_cancelled.store(false);
 	m_complete.store(false);
+	m_failed.store(false);
+	m_skippedDirectories.store(0);
+	m_firstError.store(ERROR_SUCCESS);
 	m_stopWorkers.store(false);
 	m_pendingTasks.store(0);
 
@@ -102,8 +105,12 @@ void AsyncScanEngine::WorkerThread(size_t workerIndex)
 		}
 
 		if (!m_cancelled.load()) {
-			std::wstring currentPath = task.path;
-			ScanSubtree(workerIndex, task.targetFolder, currentPath, task.depth);
+			try {
+				std::wstring currentPath = task.path;
+				ScanSubtree(workerIndex, task.targetFolder, currentPath, task.depth);
+			} catch (const std::bad_alloc&) {
+				Abort(true);
+			}
 		}
 
 		int remaining = --m_pendingTasks;
@@ -118,13 +125,32 @@ void AsyncScanEngine::WorkerThread(size_t workerIndex)
 
 void AsyncScanEngine::ScanSubtree(size_t workerIndex, CFolder* folder, std::wstring& path, unsigned int depth)
 {
-	if (m_cancelled.load() || folder == nullptr || depth > 128) return;
+	if (m_cancelled.load() || folder == nullptr) return;
+	if (depth > 128) {
+		RecordScanError(ERROR_DIRECTORY, false);
+		return;
+	}
 
 	WIN32_FIND_DATAW finddata;
 	std::wstring::size_type baseLength = PathUtil::AppendComponent(path, L"*.*");
 
 	HANDLE handle = FindFirstFileW(path.c_str(), &finddata);
+	DWORD enumerationError = handle == INVALID_HANDLE_VALUE ? GetLastError() : ERROR_SUCCESS;
+	// Always close the enumeration handle, including allocation exceptions.
+	struct FindHandle {
+		HANDLE value;
+		~FindHandle() { if (value != INVALID_HANDLE_VALUE) FindClose(value); }
+	} findHandle{handle};
 	path.resize(baseLength);
+	if (handle == INVALID_HANDLE_VALUE) {
+		// FindFirstFile reports FILE_NOT_FOUND for an existing empty directory.
+		if (enumerationError == ERROR_FILE_NOT_FOUND) {
+			DWORD attributes = GetFileAttributesW(path.c_str());
+			if (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY)) return;
+		}
+		RecordScanError(enumerationError, depth == 0);
+		return;
+	}
 	BOOL gotfile = (handle != INVALID_HANDLE_VALUE);
 
 	struct FoundChildDir {
@@ -179,7 +205,7 @@ void AsyncScanEngine::ScanSubtree(size_t workerIndex, CFolder* folder, std::wstr
 
 			if (!added) {
 				// Out of memory: abort the whole scan instead of silently dropping entries.
-				Abort();
+				Abort(true);
 			} else {
 				m_bytesScanned.fetch_add(size, std::memory_order_relaxed);
 			}
@@ -188,11 +214,14 @@ void AsyncScanEngine::ScanSubtree(size_t workerIndex, CFolder* folder, std::wstr
 
 	next_file:
 		gotfile = FindNextFileW(handle, &finddata);
+		if (!gotfile && !m_cancelled.load()) {
+			DWORD error = GetLastError();
+			if (error != ERROR_NO_MORE_FILES) RecordScanError(error, depth == 0);
+		}
 	}
 
-	if (handle != INVALID_HANDLE_VALUE) {
-		FindClose(handle);
-	}
+	FindClose(handle);
+	findHandle.value = INVALID_HANDLE_VALUE;
 
 	if (m_cancelled.load()) return;
 
@@ -220,7 +249,7 @@ void AsyncScanEngine::ScanSubtree(size_t workerIndex, CFolder* folder, std::wstr
 		if (!added) {
 			// Out of memory: abort the whole scan instead of silently dropping the subtree.
 			delete child;
-			Abort();
+			Abort(true);
 			break;
 		}
 
@@ -249,8 +278,21 @@ void AsyncScanEngine::ScanSubtree(size_t workerIndex, CFolder* folder, std::wstr
 	}
 }
 
-void AsyncScanEngine::Abort()
+void AsyncScanEngine::RecordScanError(unsigned long error, bool rootFailure)
 {
+	m_skippedDirectories.fetch_add(1);
+	unsigned long expected = ERROR_SUCCESS;
+	m_firstError.compare_exchange_strong(expected, error);
+	if (rootFailure) Abort(true);
+}
+
+void AsyncScanEngine::Abort(bool failed)
+{
+	if (failed) {
+		m_failed.store(true);
+		unsigned long expected = ERROR_SUCCESS;
+		m_firstError.compare_exchange_strong(expected, ERROR_NOT_ENOUGH_MEMORY);
+	}
 	// The stop/cancel flags are set while holding the queue mutex so that a worker
 	// checking its wait predicate can never miss the notify that follows (a notify
 	// fired between the predicate check and blocking would otherwise be lost).
@@ -336,8 +378,12 @@ ScanProgress AsyncScanEngine::GetProgress() const
 	p.numFiles = m_numFiles.load(std::memory_order_relaxed);
 	p.numFolders = m_numFolders.load(std::memory_order_relaxed);
 	p.bytesScanned = m_bytesScanned.load(std::memory_order_relaxed);
-	p.isComplete = m_complete.load(std::memory_order_relaxed);
-	p.isCancelled = m_cancelled.load(std::memory_order_relaxed);
+	p.skippedDirectories = m_skippedDirectories.load();
+	p.firstError = m_firstError.load();
+	p.isFailed = m_failed.load();
+	p.isComplete = m_complete.load() && p.skippedDirectories == 0;
+	p.isPartial = m_complete.load() && p.skippedDirectories != 0;
+	p.isCancelled = m_cancelled.load() && !p.isFailed;
 
 	{
 		std::lock_guard<std::mutex> lock(m_pathMutex);
@@ -358,7 +404,7 @@ bool AsyncScanEngine::IsFinished() const
 
 bool AsyncScanEngine::IsCancelled() const
 {
-	return m_cancelled.load();
+	return m_cancelled.load() && !m_failed.load();
 }
 
 CFolder* AsyncScanEngine::DetachResult(CStringArena& targetArena)
@@ -404,82 +450,77 @@ void AsyncScanEngine::GenerateLiveLayout(
 	std::lock_guard<std::mutex> lock(m_treeMutex);
 	if (m_rootFolder == nullptr || m_cancelled.load()) return;
 
-	ComputeLiveSizes(m_rootFolder);
+	try {
+		ComputeLiveSizes(m_rootFolder);
 
-	unsigned int rootCount = m_rootFolder->cur;
-	if (rootCount == 0 && totalDiskSpace == 0) return;
+		unsigned int rootCount = m_rootFolder->cur;
+		if (rootCount == 0 && totalDiskSpace == 0) return;
 
-	unsigned int extraItems = 0;
-	if (freeDiskSpace > 0 && config.showFreeSpace) extraItems++;
+		unsigned int extraItems = 0;
+		if (freeDiskSpace > 0 && config.showFreeSpace) extraItems++;
 
-	unsigned int totalItems = rootCount + extraItems;
-	if (totalItems == 0) return;
+		unsigned int totalItems = rootCount + extraItems;
+		if (totalItems == 0) return;
 
-	CFolder liveRoot;
-	liveRoot.names = new (std::nothrow) wchar_t*[totalItems];
-	liveRoot.children = new (std::nothrow) CFolder*[totalItems];
-	liveRoot.sizes = new (std::nothrow) ui64[totalItems];
-	liveRoot.actualsizes = new (std::nothrow) ui64[totalItems];
-	liveRoot.times = new (std::nothrow) ui64[totalItems];
+		// The temporary folder borrows both arrays and children. Detach its fields
+		// before CFolder's owning destructor runs, on success and exception paths.
+		std::vector<wchar_t*> names(totalItems);
+		std::vector<CFolder*> children(totalItems);
+		std::vector<ui64> sizes(totalItems), actualsizes(totalItems), times(totalItems);
+		struct BorrowedFolder : CFolder {
+			~BorrowedFolder() {
+				names = nullptr; children = nullptr;
+				sizes = actualsizes = times = nullptr;
+				cur = max = 0;
+			}
+		} liveRoot;
+		liveRoot.names = names.data();
+		liveRoot.children = children.data();
+		liveRoot.sizes = sizes.data();
+		liveRoot.actualsizes = actualsizes.data();
+		liveRoot.times = times.data();
 
-	if (!liveRoot.names || !liveRoot.children || !liveRoot.sizes || !liveRoot.actualsizes || !liveRoot.times) {
-		delete[] liveRoot.names;
-		delete[] liveRoot.children;
-		delete[] liveRoot.sizes;
-		delete[] liveRoot.actualsizes;
-		delete[] liveRoot.times;
-		return;
-	}
+		liveRoot.cur = 0;
+		liveRoot.max = totalItems;
 
-	liveRoot.cur = 0;
-	liveRoot.max = totalItems;
-
-	for (unsigned int i = 0; i < rootCount; ++i) {
-		liveRoot.names[liveRoot.cur] = m_rootFolder->names[i];
-		liveRoot.children[liveRoot.cur] = m_rootFolder->children[i];
-		liveRoot.sizes[liveRoot.cur] = m_rootFolder->sizes[i];
-		liveRoot.actualsizes[liveRoot.cur] = m_rootFolder->actualsizes[i];
-		liveRoot.times[liveRoot.cur] = m_rootFolder->times[i];
-		liveRoot.cur++;
-	}
-
-	if (freeDiskSpace > 0 && config.showFreeSpace) {
-		static const wchar_t freeName[] = L"<Free Space>";
-		liveRoot.names[liveRoot.cur] = const_cast<wchar_t*>(freeName);
-		liveRoot.children[liveRoot.cur] = nullptr;
-		liveRoot.sizes[liveRoot.cur] = freeDiskSpace;
-		liveRoot.actualsizes[liveRoot.cur] = freeDiskSpace;
-		liveRoot.times[liveRoot.cur] = 0;
-		liveRoot.cur++;
-	}
-
-	TreemapEngine::ComputeLayout(0, 0, w, h, &liveRoot, 0, config, outNodes);
-
-	// Detach the snapshot from the live tree: workers keep mutating folder
-	// arrays after this lock is released, and liveRoot dies with this frame.
-	// Copying names and nulling source makes the nodes safe to keep and draw.
-	// reserve() guarantees no reallocation, so c_str() pointers stay stable.
-	outNameStorage.reserve(outNodes.size());
-	for (auto& node : outNodes) {
-		if (node.name != nullptr) {
-			outNameStorage.emplace_back(node.name);
-			node.name = outNameStorage.back().c_str();
+		for (unsigned int i = 0; i < rootCount; ++i) {
+			liveRoot.names[liveRoot.cur] = m_rootFolder->names[i];
+			liveRoot.children[liveRoot.cur] = m_rootFolder->children[i];
+			liveRoot.sizes[liveRoot.cur] = m_rootFolder->sizes[i];
+			liveRoot.actualsizes[liveRoot.cur] = m_rootFolder->actualsizes[i];
+			liveRoot.times[liveRoot.cur] = m_rootFolder->times[i];
+			liveRoot.cur++;
 		}
-		node.source = nullptr;
-		node.index = (ui32)-1;
-	}
 
-	// Cleanup without triggering CFolder recursive deletion
-	delete[] liveRoot.names;
-	delete[] liveRoot.sizes;
-	delete[] liveRoot.actualsizes;
-	delete[] liveRoot.times;
-	delete[] liveRoot.children;
-	liveRoot.names = nullptr;
-	liveRoot.children = nullptr;
-	liveRoot.sizes = nullptr;
-	liveRoot.actualsizes = nullptr;
-	liveRoot.times = nullptr;
-	liveRoot.cur = 0;
-	liveRoot.max = 0;
+		if (freeDiskSpace > 0 && config.showFreeSpace) {
+			static const wchar_t freeName[] = L"<Free Space>";
+			liveRoot.names[liveRoot.cur] = const_cast<wchar_t*>(freeName);
+			liveRoot.children[liveRoot.cur] = nullptr;
+			liveRoot.sizes[liveRoot.cur] = freeDiskSpace;
+			liveRoot.actualsizes[liveRoot.cur] = freeDiskSpace;
+			liveRoot.times[liveRoot.cur] = 0;
+			liveRoot.cur++;
+		}
+
+		TreemapEngine::ComputeLayout(0, 0, w, h, &liveRoot, 0, config, outNodes);
+
+		// Detach the snapshot from the live tree: workers keep mutating folder
+		// arrays after this lock is released, and liveRoot dies with this frame.
+		// Copying names and nulling source makes the nodes safe to keep and draw.
+		// reserve() guarantees no reallocation, so c_str() pointers stay stable.
+		outNameStorage.reserve(outNodes.size());
+		for (auto& node : outNodes) {
+			if (node.name != nullptr) {
+				outNameStorage.emplace_back(node.name);
+				node.name = outNameStorage.back().c_str();
+			}
+			node.source = nullptr;
+			node.index = (ui32)-1;
+		}
+
+	} catch (const std::bad_alloc&) {
+		// Discard an incomplete frame; the scan tree remains owned by the engine.
+		outNodes.clear();
+		outNameStorage.clear();
+	}
 }

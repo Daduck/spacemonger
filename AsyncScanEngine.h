@@ -30,8 +30,15 @@ struct ScanProgress {
 	ui64 numFolders;
 	ui64 bytesScanned;
 	std::wstring currentPath;
+	// Terminal outcomes: complete (no omissions), partial (usable result),
+	// failed (no usable result), or cancelled by the owner.
 	bool isComplete;
 	bool isCancelled;
+	bool isPartial;
+	bool isFailed;
+	// Counts directly skipped/interrupted directories, not their descendants.
+	ui64 skippedDirectories;
+	unsigned long firstError;
 };
 
 class AsyncScanEngine {
@@ -71,7 +78,8 @@ private:
 	void WorkerThread(size_t workerIndex);
 	void ScanSubtree(size_t workerIndex, CFolder* folder, std::wstring& path, unsigned int depth);
 	// Flags-only cancellation, safe to call from worker threads.
-	void Abort();
+	void Abort(bool failed = false);
+	void RecordScanError(unsigned long error, bool rootFailure);
 
 	std::wstring m_rootPath;
 	ui64 m_clusterMask;
@@ -98,6 +106,9 @@ private:
 	std::atomic<bool> m_cancelled{false};
 	std::atomic<bool> m_running{false};
 	std::atomic<bool> m_complete{false};
+	std::atomic<bool> m_failed{false};
+	std::atomic<ui64> m_skippedDirectories{0};
+	std::atomic<unsigned long> m_firstError{0};
 
 	std::atomic<ui64> m_numFiles{0};
 	std::atomic<ui64> m_numFolders{0};

@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 3.25)
 
 project(SpaceMonger VERSION 1.4.3 LANGUAGES CXX RC)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 if(NOT MSVC)
   message(FATAL_ERROR "SpaceMonger is a Win32 MFC application and currently requires MSVC.")
 endif()
@@ -188,3 +192,5 @@ set_target_properties(Treemap_test PROPERTIES
 )
 add_test(NAME Treemap_test COMMAND Treemap_test)
 
+# Bound concurrency regressions in CI as well as local CTest runs.
+set_tests_properties(AsyncScan_test DiskUsage_test PROPERTIES TIMEOUT 60)

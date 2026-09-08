@@ -55,4 +55,6 @@ Lang LangFr = {
 	"Vrombir Animé", "Souvenir Position du Window",
 	"Montrer les Boites «Rollovers»",
 	"Properties...",
+	"L'analyse n'a pas pu aboutir (erreur Windows %lu).",
+	"Analyse incomplète : %llu dossiers n'ont pas pu être entièrement analysés (première erreur Windows %lu). Les tailles peuvent être sous-estimées.",
 };

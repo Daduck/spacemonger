@@ -51,3 +51,23 @@ Do not open `legacy/SpaceMonger.dsw` in modern Visual Studio as the primary work
 ## VS Code
 
 Open the folder and select your desired CMake configure preset (`vs2022-x64`, `vs2022-win32`, or `vs2022-arm64`) using the CMake Tools extension, or run the command-line presets from the integrated terminal.
+
+
+## Validation coverage
+
+CMake explicitly requires C++17. CI builds Debug and Release for Win32, x64,
+and ARM64, and runs the nine CTest executables on Win32 and x64. ARM64 tests
+require a compatible runtime and are not currently executed by CI.
+
+Scanner regression tests create temporary directories, including an access-denied
+fixture whose permissions are restored before cleanup. They cover missing and
+empty roots, partial scans, cancellation, snapshot lifetime, and allocation failure.
+Run with a bounded timeout when investigating hangs:
+
+```powershell
+ctest --preset vs2022-x64-debug --timeout 60
+```
+
+Automated checks do not replace interactive verification of scanning dialogs,
+mixed-DPI rendering, and shell operations. Release builds use the static runtime
+and are distributed as a single SpaceMonger.exe.

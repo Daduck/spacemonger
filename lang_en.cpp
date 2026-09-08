@@ -66,6 +66,8 @@ Lang LangUs = {
 	"Animated Zoom In / Zoom Out", "Remember Window Position",
 	"Show Rollover Boxes",
 	"Properties...",
+	"The scan could not be completed (Windows error %lu).",
+	"Scan results are incomplete: %llu directories could not be fully scanned (first Windows error %lu). Sizes may be understated.",
 };
 
 static const char *ukcolornames[] = {
@@ -105,5 +107,7 @@ Lang LangUk = {
 	"Animated Zoom In / Zoom Out", "Remember Window Position",
 	"Show Rollover Boxes",
 	"Properties...",
+	"The scan could not be completed (Windows error %lu).",
+	"Scan results are incomplete: %llu directories could not be fully scanned (first Windows error %lu). Sizes may be understated.",
 };
 

@@ -1,5 +1,14 @@
 # Live Progressive Treemap Rendering During Scan Implementation Plan
 
+> **Implementation status (2026-09-08):** Implemented, with later adjustments:
+> updates use a 250 ms minimum interval and skip unchanged scans. The
+> `<Scanning...>` placeholder was removed. Snapshots copy names into caller-owned
+> storage and clear source pointers; RAII protects borrowed arrays and children
+> when allocation fails. Size calculation and layout hold the tree mutex, so
+> zero throughput impact is an unverified goal, not a guarantee.
+> The original design/steps below are retained as historical context.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Implement live progressive treemap rendering during async disk scanning in SpaceMonger, allowing folders to dynamically populate the canvas behind the scanning dialog.
@@ -35,7 +44,8 @@
       ui64 totalDiskSpace,
       ui64 freeDiskSpace,
       const TreemapConfig& config,
-      std::vector<TreemapNode>& outNodes
+      std::vector<TreemapNode>& outNodes,
+    std::vector<std::wstring>& outNameStorage
   );
   ```
 

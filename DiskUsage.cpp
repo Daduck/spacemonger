@@ -72,15 +72,11 @@ SM_UINT64 SM_ChooseDisplayedFileSize(const SM_FILE_SIZE_INFO *info, SM_UINT64 cl
 
 static SM_GetCompressedFileSizeFunc SM_GetCompressedFileSizeProc(void)
 {
-	static int initialized = 0;
-	static SM_GetCompressedFileSizeFunc get_compressed_size = NULL;
-
-	if (!initialized) {
+	static const SM_GetCompressedFileSizeFunc get_compressed_size = []() {
 		HMODULE kernel = GetModuleHandle("KERNEL32.DLL");
-		if (kernel != NULL)
-			get_compressed_size = (SM_GetCompressedFileSizeFunc)GetProcAddress(kernel, "GetCompressedFileSizeA");
-		initialized = 1;
-	}
+		return kernel == NULL ? nullptr
+			: reinterpret_cast<SM_GetCompressedFileSizeFunc>(GetProcAddress(kernel, "GetCompressedFileSizeA"));
+	}();
 
 	return get_compressed_size;
 }
@@ -89,15 +85,11 @@ typedef DWORD (WINAPI *SM_GetCompressedFileSizeWFunc)(LPCWSTR filename, LPDWORD 
 
 static SM_GetCompressedFileSizeWFunc SM_GetCompressedFileSizeWProc(void)
 {
-	static int initialized = 0;
-	static SM_GetCompressedFileSizeWFunc get_compressed_size = NULL;
-
-	if (!initialized) {
+	static const SM_GetCompressedFileSizeWFunc get_compressed_size = []() {
 		HMODULE kernel = GetModuleHandle("KERNEL32.DLL");
-		if (kernel != NULL)
-			get_compressed_size = (SM_GetCompressedFileSizeWFunc)GetProcAddress(kernel, "GetCompressedFileSizeW");
-		initialized = 1;
-	}
+		return kernel == NULL ? nullptr
+			: reinterpret_cast<SM_GetCompressedFileSizeWFunc>(GetProcAddress(kernel, "GetCompressedFileSizeW"));
+	}();
 
 	return get_compressed_size;
 }

@@ -1,5 +1,10 @@
 # Treemap Layout Engine Implementation Plan
 
+> **Implementation status (2026-09-08):** Completed. The extraction description
+> below records the pre-extraction design. TreemapLayout now owns layout and
+> hit testing; CFolderView handles drawing. CMake explicitly selects C++17.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Extract the treemap spatial partitioning algorithm and hit-testing out of `CFolderView` into a pure, headless C++ module (`TreemapLayout.h` and `TreemapLayout.cpp`) backed by `std::vector<TreemapNode>`, and add a comprehensive unit test suite `Treemap_test`.

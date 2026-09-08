@@ -5,10 +5,21 @@ incremental modernization rather than a full rewrite.
 
 ## Next
 
+- [ ] Complete the Unicode UI migration described below.
+- [ ] Benchmark live-layout mutex hold time and scan throughput before implementing incremental size propagation.
+- [ ] Resolve existing x64 conversion warnings in DriveDialog.cpp and Freedoc.cpp.
+- [ ] Verify failed/partial-scan dialogs, cancellation, and mixed-DPI behavior interactively.
+
+## Recently Completed
+
+- [x] Fix live snapshot ownership on allocation failure and exception paths; add allocation-failure regression coverage.
+- [x] Make allocated-size API initialization safe for concurrent scan workers.
+- [x] Report failed roots and partial scans, including access-denied directories and depth-limit truncation.
+- [x] Reconcile current documentation and explicitly select C++17 in CMake.
 - [x] Replace stale VS Code tasks with CMake configure/build/test tasks.
 - [x] Remove local absolute compiler and SDK paths from VS Code C/C++ settings.
-- [x] Document the VS Code workflow in `BUILDING.md`.
-- [x] Fix GDI / HICON leak in `CDriveDialog` with proper `CDriveInfo` RAII destruction.
+- [x] Document the VS Code workflow in BUILDING.md.
+- [x] Fix GDI / HICON leak in CDriveDialog with proper CDriveInfo RAII destruction.
 
 ## Filesystem Scanning
 
@@ -19,14 +30,14 @@ incremental modernization rather than a full rewrite.
 - [x] Review reparse-point handling for modern Windows symlinks, mount points,
       and cloud placeholders.
 - [x] **Multi-Threaded / Asynchronous Scanning**
-      *Background:* `CFolder::LoadFolder` currently runs synchronously on the main thread, intermittently pumping messages via `::PeekMessage` to keep the UI from completely freezing. On modern multi-core systems and high-IOPS NVMe SSDs, single-threaded synchronous directory enumeration leaves significant I/O throughput untapped. Decoupling directory walking into a background worker thread pool (or task queue with work-stealing) with thread-safe tree aggregation will cut scan times significantly on modern drives and keep the UI completely responsive.
+      Implemented in AsyncScanEngine with background directory workers and a UI message loop. Throughput depends on the filesystem and live-layout work; measure before claiming a speedup.
 - [x] **Live Progressive Treemap Rendering During Scan**
-      *Background:* Render live snapshots of the treemap at 10 FPS directly behind the classic "Scanning Disk..." progress dialog as background worker threads discover files and folders, providing dynamic visual feedback without degrading NVMe/SSD scan throughput.
+      Implemented with a 250 ms minimum interval and change detection. Snapshots own their copied names; layout work still holds the tree mutex.
 
 ## Code Health & Architecture
 
 - [x] **Extract Treemap Layout Engine into a Pure Module**
-      *Background:* Treemap coordinate partitioning (`BuildFolderLayout`, `SizeFolders`) is currently embedded directly inside `CFolderView`, interleaved with MFC device context drawing. Extracting the spatial partitioning algorithm into an independent, non-UI module (following the pattern of `DiskUsage`) will allow headless automated unit testing for tricky geometries, degenerate aspect ratios, and zero-byte files without requiring an initialized Win32 window.
+      Implemented in TreemapLayout.cpp with headless layout and hit-testing regression coverage.
 - [x] Replace fixed-size buffers and unsafe formatting calls in narrow passes.
 - [ ] Decide whether unused `CFolder` mutation methods (`DelFile`, `RenameFile`, `FindFile`) should be implemented or removed.
 - [ ] **Full Unicode Migration (`_UNICODE` / `UNICODE`)**
@@ -35,7 +46,7 @@ incremental modernization rather than a full rewrite.
 
 ## Performance Optimizations
 
-- [x] Increase `CFolder` initial array capacity (from `max = 2` to `16` or `32`) to eliminate thousands of `malloc`/`memcpy` reallocations.
+- [x] Allocate CFolder entry arrays lazily, starting at eight entries and doubling as needed.
 - [x] Implement an Arena Allocator (Memory Pool) for filenames to prevent tiny heap fragmentation during large drive scans.
 - [x] Use adaptive sorting in `CFolder::Finalize` (e.g., `std::sort` for small folders instead of an 8-pass Radix sort).
 - [x] Store internal strings as `wchar_t*` instead of `char*` to eliminate `PathUtil::WideToAnsi` conversion overhead during scanning.
@@ -48,7 +59,7 @@ incremental modernization rather than a full rewrite.
 ## Platform & UI Modernization
 
 - [x] **64-bit (x64) and ARM64 Build Support**
-      *Background:* `CMakeLists.txt` currently enforces 32-bit compilation (`CMAKE_SIZEOF_VOID_P EQUAL 4`). On modern Windows installations with high-capacity drives containing millions of files, a 32-bit process is constrained by the 2–3 GB user-mode virtual address space. Updating CMake configurations, pointer/integer conversions, and CI to support `x64` and `ARM64` builds provides full memory scalability and native execution on Windows on ARM hardware (e.g. Snapdragon X / Surface).
+      Implemented Win32, x64, and ARM64 build presets and CI builds. CI executes tests on x86/x64; ARM64 currently has build coverage only.
 - [x] **High-DPI Support (Per-Monitor V2) & Classic 3D Character Preservation**
       *Background:* SpaceMonger retains its authentic, beloved 1990s retro 3D beveled toolbar buttons and crisp pixel typography while adding modern `PerMonitorV2` DPI awareness, long path support, and flicker-free button state updates.
 - [ ] **Dark Mode Theme**: Optional Dark Mode palette for the treemap background, borders, and tooltip windows.

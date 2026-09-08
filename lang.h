@@ -32,6 +32,7 @@ struct Lang {
 	const char *autorescan, *disabledelete, *animatedzoom, *savepos;
 	const char *showrolloverbox;
 	const char *properties;
+	const char *scan_failed_format, *scan_partial_format;
 };
 
 struct LangEntry {
