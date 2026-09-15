@@ -42,8 +42,11 @@ Lang LangUs = {
 		" free, the author cannot and will not assume responsibility"
 		" for this program's behavior.  There are no warranties of any"
 		" kind, expressed or implied, on this product.",
-	"Have questions?  Found a bug?  Want a feature?\n"
-		"E-mail to <sean@werkema.com>.",
+	"An independently maintained continuation of the classic SpaceMonger.",
+	"Current maintainer: Johnny J. Andersen (Anderki.dk)",
+	"&Project website",
+	"&Report a bug",
+	"SpaceMonger could not open this URL:\n%s",
 	"OK", "Cancel",
 	"bytes", "Kb", "Mb", "Gb",
 	"<Free Space: %d.%d%%>",
@@ -83,8 +86,11 @@ Lang LangUk = {
 		" free, the author cannot and will not assume responsibility"
 		" for this program's behavior.  There are no warranties of any"
 		" kind, expressed or implied, on this product.",
-	"Have questions?  Found a bug?  Want a feature?\n"
-		"E-mail to <sean@werkema.com>.",
+	"An independently maintained continuation of the classic SpaceMonger.",
+	"Current maintainer: Johnny J. Andersen (Anderki.dk)",
+	"&Project website",
+	"&Report a bug",
+	"SpaceMonger could not open this URL:\n%s",
 	"OK", "Cancel",
 	"bytes", "Kb", "Mb", "Gb",
 	"<Free Space: %d.%d%%>",

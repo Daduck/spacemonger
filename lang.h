@@ -7,7 +7,11 @@ struct Lang {
 	const char *about_spacemonger;
 	const char *freeware;
 	const char *warranty;
-	const char *email;
+	const char *description;
+	const char *maintainer;
+	const char *project_website;
+	const char *report_bug;
+	const char *open_url_failed_format;
 	const char *ok, *cancel;
 	const char *bytes, *kb, *mb, *gb;
 	const char *freespace_format;

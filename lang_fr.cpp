@@ -31,8 +31,11 @@ Lang LangFr = {
 		" free, the author cannot and will not assume responsibility"
 		" for this program's behavior.  There are no warranties of any"
 		" kind, expressed or implied, on this product.»",
-	"Vous avez des questions?  Trouvez un «bug»?  Voudriez quelque-chose?  "
-		"Envoyez e-mail à «sean@werkema.com».",
+	"Une continuation indépendante du SpaceMonger classique.",
+	"Mainteneur actuel : Johnny J. Andersen (Anderki.dk)",
+	"Site &Web du projet",
+	"Signaler un &bogue",
+	"SpaceMonger n'a pas pu ouvrir cette adresse :\n%s",
 	"D'accord", "Annul",
 	"octets", "Ko", "Mo", "Go",
 	"<l'Espace Libre: %d,%d%%>",

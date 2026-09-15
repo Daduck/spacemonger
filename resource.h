@@ -77,6 +77,10 @@
 #define IDC_STATIC_MISCOPTIONS          1041
 #define IDC_LANG                        1042
 #define IDC_SHOW_ROLLOVER_BOX           1043
+#define IDC_STATIC_DESCRIPTION          1044
+#define IDC_STATIC_MAINTAINER           1045
+#define IDC_PROJECT_WEBSITE             1046
+#define IDC_REPORT_BUG                  1047
 #define ID_FILE_REFRESH                 40002
 #define ID_VIEW_FREE                    40003
 #define ID_VIEW_ZOOM_IN                 40004
@@ -88,12 +92,12 @@
 #define ID_FILE_PROPERTIES              40018
 
 // Next default values for new objects
-// 
+//
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        124
 #define _APS_NEXT_COMMAND_VALUE         40019
-#define _APS_NEXT_CONTROL_VALUE         1044
+#define _APS_NEXT_CONTROL_VALUE         1048
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif
