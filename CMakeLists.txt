@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(SpaceMonger VERSION 1.4.3 LANGUAGES CXX RC)
+project(SpaceMonger VERSION 1.4.4 LANGUAGES CXX RC)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

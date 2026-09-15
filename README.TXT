@@ -1,5 +1,5 @@
 
-SpaceMonger Version 1.4.3
+SpaceMonger Version 1.4.4
 -------------------------
 
 
@@ -19,7 +19,7 @@ The latest version of SpaceMonger is always available at its web page:
 SYSTEM REQUIREMENTS
 -------------------
 
-SpaceMonger 1.4.3 is optimized for modern Windows environments. It is intended
+SpaceMonger 1.4.4 is optimized for modern Windows environments. It is intended
 to run on Windows 10, Windows 11, and modern Windows Server editions.
 Because it is a native C++ MFC application, it has virtually zero dependencies
 and remains incredibly lightweight. Any PC capable of running Windows today
@@ -114,6 +114,14 @@ users of the program to give away copies to their friends.
 
 WHAT'S NEW
 ----------
+
+Between 1.4.3 and 1.4.4 (Partial Scan Diagnostics)
+   * Partial scans now show a compact, clickable notice in the top bar
+     with the skipped-folder count and a details list of inaccessible paths.
+   * Whole-drive partial scans include an "Unavailable (estimate)"
+     treemap block when volume-used space exceeds scanned file space.
+   * Updated the About dialog to direct bug reports to the current
+     project instead of the original author's address.
 
 Between 1.4.2 and 1.4.3 (Multithreaded Scanner & Live Treemap)
    * New multithreaded scan engine that spreads directory scanning across
