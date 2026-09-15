@@ -668,12 +668,14 @@ static int test_access_denied_reports_scan_status()
 			nullptr, nullptr, nullptr, nullptr); }
 	};
 	ScanProgress partial{}, failed{};
+	std::vector<std::wstring> skippedPaths;
 	{
 		RestoreAccess restore{blocked};
 		AsyncScanEngine engine;
 		engine.StartScan(tempDir, 0, false, 2);
 		engine.WaitForCompletion();
 		partial = engine.GetProgress();
+		skippedPaths = engine.GetSkippedDirectories();
 		engine.StartScan(blocked, 0, false, 2);
 		engine.WaitForCompletion();
 		failed = engine.GetProgress();
@@ -681,6 +683,8 @@ static int test_access_denied_reports_scan_status()
 	DeleteTestDirectory(tempDir);
 	CHECK(partial.isPartial && !partial.isComplete && !partial.isFailed);
 	CHECK(partial.skippedDirectories == 1 && partial.firstError == ERROR_ACCESS_DENIED);
+	CHECK(skippedPaths.size() == 1 && (skippedPaths[0] == blocked
+		|| skippedPaths[0] == blocked + L"\\"));
 	CHECK(failed.isFailed && !failed.isComplete && !failed.isCancelled);
 	CHECK(failed.firstError == ERROR_ACCESS_DENIED);
 	return 1;

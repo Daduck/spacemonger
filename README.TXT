@@ -47,7 +47,11 @@ A failed root scan is reported as an error. If some directories cannot be
 fully enumerated (for example, access is denied or nesting exceeds the
 scanner's 128-level limit), the result is marked incomplete and its totals
 may be understated. Skipped-directory counts describe directly skipped or
-interrupted directories, not every descendant they may contain.
+interrupted directories, not every descendant they may contain. For a partial
+scan of an entire drive, the treemap also includes an "Unavailable (estimate)"
+block for the positive difference between volume-used space and scanned file
+space. This is an accounting estimate: it can include inaccessible content,
+filesystem metadata, and changes made while the scan was running.
 
 
 FIRST-TIME INSTRUCTIONS

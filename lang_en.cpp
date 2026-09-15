@@ -71,6 +71,12 @@ Lang LangUs = {
 	"Properties...",
 	"The scan could not be completed (Windows error %lu).",
 	"Scan results are incomplete: %llu directories could not be fully scanned (first Windows error %lu). Sizes may be understated.",
+	"Scan completed with %llu folders skipped. Sizes may be understated.",
+	"Skipped: %llu",
+	"Scan details",
+	"%llu folders were skipped; showing %llu paths.",
+	"Copy paths",
+	"Unavailable (estimate)",
 };
 
 static const char *ukcolornames[] = {
@@ -115,5 +121,11 @@ Lang LangUk = {
 	"Properties...",
 	"The scan could not be completed (Windows error %lu).",
 	"Scan results are incomplete: %llu directories could not be fully scanned (first Windows error %lu). Sizes may be understated.",
+	"Scan completed with %llu folders skipped. Sizes may be understated.",
+	"Skipped: %llu",
+	"Scan details",
+	"%llu folders were skipped; showing %llu paths.",
+	"Copy paths",
+	"Unavailable (estimate)",
 };
 

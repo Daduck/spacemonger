@@ -189,6 +189,44 @@ static int test_free_space_visibility()
 	return 1;
 }
 
+static int test_unavailable_space_is_special_and_visible()
+{
+	CStringArena arena;
+	CFolder folder;
+	folder.AddFileWithArena(arena, L"data.bin", 8, 600, 600, 0);
+	folder.AddFileWithArena(arena, L"<Free Space>", 12, 200, 200, 0);
+	folder.AddFileWithArena(arena, L"|Unavailable (estimate)", 23, 200, 200, 0);
+	folder.Finalize();
+
+	TreemapConfig config;
+	std::vector<TreemapNode> nodes;
+	TreemapEngine::ComputeLayout(0, 0, 800, 600, &folder, 0, config, nodes);
+
+	bool foundUnavailable = false;
+	for (const auto &n : nodes) {
+		if (n.name != nullptr && wcscmp(n.name, L"|Unavailable (estimate)") == 0) {
+			foundUnavailable = true;
+			CHECK(n.IsSpecial());
+			CHECK((n.flags & TREEMAP_FLAG_UNAVAILABLE) != 0);
+		}
+	}
+	CHECK(foundUnavailable);
+
+	// The unavailable estimate remains visible when the user hides free space.
+	config.showFreeSpace = false;
+	nodes.clear();
+	TreemapEngine::ComputeLayout(0, 0, 800, 600, &folder, 0, config, nodes);
+	foundUnavailable = false;
+	for (const auto &n : nodes) {
+		if (n.name != nullptr && wcscmp(n.name, L"|Unavailable (estimate)") == 0) {
+			foundUnavailable = true;
+		}
+		CHECK(n.name == nullptr || wcscmp(n.name, L"<Free Space>") != 0);
+	}
+	CHECK(foundUnavailable);
+	return 1;
+}
+
 static int test_degenerate_geometries()
 {
 	CStringArena arena;
@@ -456,6 +494,7 @@ int main()
 	if (!test_min_dimension_dpi_scaling()) return 1;
 	if (!test_aspect_split_and_bias()) return 1;
 	if (!test_free_space_visibility()) return 1;
+	if (!test_unavailable_space_is_special_and_visible()) return 1;
 	if (!test_degenerate_geometries()) return 1;
 	if (!test_hit_testing_leaf_and_container()) return 1;
 	if (!test_multi_level_nesting()) return 1;
@@ -467,4 +506,3 @@ int main()
 	printf("Treemap_test passed successfully.\n");
 	return 0;
 }
-

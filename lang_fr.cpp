@@ -60,4 +60,10 @@ Lang LangFr = {
 	"Properties...",
 	"L'analyse n'a pas pu aboutir (erreur Windows %lu).",
 	"Analyse incomplète : %llu dossiers n'ont pas pu être entièrement analysés (première erreur Windows %lu). Les tailles peuvent être sous-estimées.",
+	"Analyse terminée avec %llu dossiers ignorés. Les tailles peuvent être sous-estimées.",
+	"Ignorés : %llu",
+	"Détails de l'analyse",
+	"%llu dossiers ont été ignorés ; %llu chemins sont affichés.",
+	"Copier les chemins",
+	"Indisponible (estimation)",
 };

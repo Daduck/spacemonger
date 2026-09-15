@@ -54,6 +54,7 @@ public:
 	void RequestStop();
 	void WaitForCompletion();
 	ScanProgress GetProgress() const;
+	const std::vector<std::wstring>& GetSkippedDirectories() const;
 	bool IsScanning() const;
 	// True once every worker thread has returned (they may not be joined yet).
 	bool IsFinished() const;
@@ -79,7 +80,7 @@ private:
 	void ScanSubtree(size_t workerIndex, CFolder* folder, std::wstring& path, unsigned int depth);
 	// Flags-only cancellation, safe to call from worker threads.
 	void Abort(bool failed = false);
-	void RecordScanError(unsigned long error, bool rootFailure);
+	void RecordScanError(unsigned long error, bool rootFailure, const std::wstring& path);
 
 	std::wstring m_rootPath;
 	ui64 m_clusterMask;
@@ -109,6 +110,9 @@ private:
 	std::atomic<bool> m_failed{false};
 	std::atomic<ui64> m_skippedDirectories{0};
 	std::atomic<unsigned long> m_firstError{0};
+	static const size_t kMaxSkippedPaths = 4096;
+	std::vector<std::wstring> m_skippedPaths;
+	mutable std::mutex m_diagnosticsMutex;
 
 	std::atomic<ui64> m_numFiles{0};
 	std::atomic<ui64> m_numFolders{0};

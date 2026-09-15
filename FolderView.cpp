@@ -241,7 +241,7 @@ void CFolderView::HighlightPathAtPoint(const CPoint &point)
 	BOOL changed = FALSE;
 
 	for (auto &cur : m_layoutNodes) {
-		if (cur.name != NULL && cur.name[0] != '<') {
+		if (cur.name != NULL && !cur.IsSpecial()) {
 			BOOL inside = point.x > cur.x && point.y > cur.y
 				&& point.x < cur.x + cur.w && point.y < cur.y + cur.h;
 			if (inside && !(cur.flags & TREEMAP_FLAG_HOVER)) {
@@ -357,7 +357,7 @@ void CFolderView::SetupInfoTip(const TreemapNode *cur)
 {
 	m_infotipwnd.EnableWindow(0);
 
-	if (cur == NULL || cur->name == NULL || cur->name[0] == '<')
+	if (cur == NULL || cur->name == NULL || cur->IsSpecial())
 		return;
 
 	std::wstring widePath = BuildItemPathW(cur);
@@ -416,7 +416,7 @@ void CFolderView::SetupNameTip(const TreemapNode *cur)
 {
 	m_nametipwnd.EnableWindow(0);
 
-	if (cur == NULL) return;
+	if (cur == NULL || cur->name == NULL || cur->IsSpecial()) return;
 
 	CDC *pDC = GetDC();
 	pDC->SelectObject(&minifont);
@@ -742,7 +742,7 @@ void CFolderView::MinimalDrawDisplayFolder(CDC *pDC, const TreemapNode *cur, BOO
 		if (size.cy > h - 2 || (cur->flags & 1)) ty = y + 1;
 		else ty = y + (h - size.cy) / 2;
 
-		if (cur->flags & 2) {
+		if ((cur->flags & TREEMAP_FLAG_SPECIAL) && !(cur->flags & TREEMAP_FLAG_UNAVAILABLE)) {
 			// There's only one free-space block, so we can afford to
 			// be a little less efficient with it.
 			CFolderTree *ft = (CFolderTree *)GetDocument();
@@ -769,6 +769,26 @@ void CFolderView::MinimalDrawDisplayFolder(CDC *pDC, const TreemapNode *cur, BOO
 		}
 		else {
 			if (sel) pDC->SetTextColor(RGB(0xFF,0xFF,0xFF));
+			if (cur->flags & TREEMAP_FLAG_UNAVAILABLE) {
+				// The block is an estimate, so show its label and size without
+				// treating it as a real file path.
+				const wchar_t *label = cur->name + 1;
+				int labelLen = (int)wcslen(label);
+				CSize labelSize;
+				::GetTextExtentPoint32W(pDC->GetSafeHdc(), label, labelLen, &labelSize);
+				int labelX = labelSize.cx > w - 2 ? x + 2 : x + (w - labelSize.cx) / 2;
+				::TextOutW(pDC->GetSafeHdc(), labelX, ty - 6, label, labelLen);
+
+				CFolderTree *ft = (CFolderTree *)GetDocument();
+				if (ft != NULL && cur->source != NULL && cur->index != (ui32)-1) {
+					CString sizeString = GetSizeString(cur->source->sizes[cur->index], ft->totalspace, 0);
+					size = pDC->GetTextExtent(sizeString);
+					int sizeX = size.cx > w - 2 ? x + 2 : x + (w - size.cx) / 2;
+					pDC->TextOut(sizeX, ty + 6, sizeString);
+				}
+				pDC->SelectClipRgn(NULL);
+				return;
+			}
 			if (!(cur->flags & 1) && h >= 36 && w >= 48 && cur->source != NULL && cur->index != (ui32)-1) {
 				// Enough room (probably) for the date and file size
 				CString string;

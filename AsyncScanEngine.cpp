@@ -46,6 +46,10 @@ bool AsyncScanEngine::StartScan(const std::wstring& rootPath, ui64 clusterMask, 
 	m_failed.store(false);
 	m_skippedDirectories.store(0);
 	m_firstError.store(ERROR_SUCCESS);
+	{
+		std::lock_guard<std::mutex> lock(m_diagnosticsMutex);
+		m_skippedPaths.clear();
+	}
 	m_stopWorkers.store(false);
 	m_pendingTasks.store(0);
 
@@ -127,7 +131,7 @@ void AsyncScanEngine::ScanSubtree(size_t workerIndex, CFolder* folder, std::wstr
 {
 	if (m_cancelled.load() || folder == nullptr) return;
 	if (depth > 128) {
-		RecordScanError(ERROR_DIRECTORY, false);
+		RecordScanError(ERROR_DIRECTORY, false, path);
 		return;
 	}
 
@@ -148,7 +152,7 @@ void AsyncScanEngine::ScanSubtree(size_t workerIndex, CFolder* folder, std::wstr
 			DWORD attributes = GetFileAttributesW(path.c_str());
 			if (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY)) return;
 		}
-		RecordScanError(enumerationError, depth == 0);
+		RecordScanError(enumerationError, depth == 0, path);
 		return;
 	}
 	BOOL gotfile = (handle != INVALID_HANDLE_VALUE);
@@ -216,7 +220,7 @@ void AsyncScanEngine::ScanSubtree(size_t workerIndex, CFolder* folder, std::wstr
 		gotfile = FindNextFileW(handle, &finddata);
 		if (!gotfile && !m_cancelled.load()) {
 			DWORD error = GetLastError();
-			if (error != ERROR_NO_MORE_FILES) RecordScanError(error, depth == 0);
+			if (error != ERROR_NO_MORE_FILES) RecordScanError(error, depth == 0, path);
 		}
 	}
 
@@ -278,11 +282,17 @@ void AsyncScanEngine::ScanSubtree(size_t workerIndex, CFolder* folder, std::wstr
 	}
 }
 
-void AsyncScanEngine::RecordScanError(unsigned long error, bool rootFailure)
+void AsyncScanEngine::RecordScanError(unsigned long error, bool rootFailure, const std::wstring& path)
 {
 	m_skippedDirectories.fetch_add(1);
 	unsigned long expected = ERROR_SUCCESS;
 	m_firstError.compare_exchange_strong(expected, error);
+	{
+		std::lock_guard<std::mutex> lock(m_diagnosticsMutex);
+		if (m_skippedPaths.size() < kMaxSkippedPaths) {
+			m_skippedPaths.push_back(PathUtil::RemoveLongPathPrefix(path));
+		}
+	}
 	if (rootFailure) Abort(true);
 }
 
@@ -390,6 +400,13 @@ ScanProgress AsyncScanEngine::GetProgress() const
 		p.currentPath = m_latestPath;
 	}
 	return p;
+}
+
+const std::vector<std::wstring>& AsyncScanEngine::GetSkippedDirectories() const
+{
+	// Callers must read this after WaitForCompletion(), when worker threads
+	// can no longer append diagnostics.
+	return m_skippedPaths;
 }
 
 bool AsyncScanEngine::IsScanning() const

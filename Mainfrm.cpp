@@ -3,6 +3,7 @@
 #include "SpaceMonger.h"
 #include "FolderView.h"
 #include "AboutDialog.h"
+#include "ScanDetailsDialog.h"
 #include "Lang.h"
 
 /////////////////////////////////////////////////////////////////////////////
@@ -21,9 +22,32 @@ BEGIN_MESSAGE_MAP(CMainFrame, CFrameWnd)
 	ON_WM_WINDOWPOSCHANGED()
 	ON_WM_SHOWWINDOW()
 	ON_MESSAGE(0x02E0, OnDpiChanged)
+	ON_MESSAGE(WM_SCAN_NOTICE_CLICKED, OnScanNoticeClickedMessage)
 	//}}AFX_MSG_MAP
+	ON_UPDATE_COMMAND_UI(IDC_SCAN_NOTICE, OnScanNoticeUpdate)
 	ON_UPDATE_COMMAND_UI_RANGE(100, 41000, OnIgnoreUpdate)
 END_MESSAGE_MAP()
+
+BEGIN_MESSAGE_MAP(CScanNoticeButton, CButton)
+	ON_WM_LBUTTONUP()
+	ON_WM_KEYUP()
+END_MESSAGE_MAP()
+
+void CScanNoticeButton::OnLButtonUp(UINT nFlags, CPoint point)
+{
+	CButton::OnLButtonUp(nFlags, point);
+	CRect rect;
+	GetClientRect(&rect);
+	if (rect.PtInRect(point) && GetParent() != NULL)
+		GetParent()->SendMessage(WM_SCAN_NOTICE_CLICKED, 0, 0);
+}
+
+void CScanNoticeButton::OnKeyUp(UINT nChar, UINT nRepCnt, UINT nFlags)
+{
+	CButton::OnKeyUp(nChar, nRepCnt, nFlags);
+	if ((nChar == VK_SPACE || nChar == VK_RETURN) && GetParent() != NULL)
+		GetParent()->SendMessage(WM_SCAN_NOTICE_CLICKED, 0, 0);
+}
 
 CMainFrame::CMainFrame()
 {
@@ -55,6 +79,9 @@ int CMainFrame::OnCreate(LPCREATESTRUCT lpCreateStruct)
 	//SetIcon(hicon, 0);
 
 	if (!m_toolbar.Create(this)) return(-1);
+	if (!m_scanNoticeButton.Create("", WS_CHILD | BS_PUSHBUTTON | WS_TABSTOP,
+		CRect(0, 0, 1, 1), this, IDC_SCAN_NOTICE)) return(-1);
+	m_scanNoticeButton.ShowWindow(SW_HIDE);
 
 	CMenu *menu = GetSystemMenu(FALSE);
 	menu->AppendMenu(MF_SEPARATOR);
@@ -126,6 +153,16 @@ void CMainFrame::RecalcLayout(BOOL bNotify)
 	// Position our two toolbars
 	m_toolbar.SetWindowPos(NULL, 0, -2, width, 30,
 		SWP_NOZORDER|SWP_NOACTIVATE);
+	if (::IsWindow(m_scanNoticeButton.m_hWnd) && m_scanNotice.IsVisible()) {
+		CRect toolbarRect;
+		m_toolbar.GetWindowRect(&toolbarRect);
+		ScreenToClient(&toolbarRect);
+		int noticeWidth = min(120, max(112, width / 5));
+		m_scanNoticeButton.SetWindowPos(&CWnd::wndTop,
+			toolbarRect.right - noticeWidth - 4, toolbarRect.top + 5,
+			noticeWidth, 20,
+			SWP_NOACTIVATE | SWP_SHOWWINDOW);
+	}
 	rectBorder.top += 28;
 
 	// First count how many windows need to be rearranged
@@ -133,7 +170,7 @@ void CMainFrame::RecalcLayout(BOOL bNotify)
 	if (first != NULL) {
 		wnd = first;
 		while (1) {
-			if (wnd->m_hWnd != m_toolbar.m_hWnd)
+			if (wnd->m_hWnd != m_toolbar.m_hWnd && wnd->m_hWnd != m_scanNoticeButton.m_hWnd)
 				numwnds++;
 			if (wnd == last) break;
 			wnd = wnd->GetWindow(GW_HWNDNEXT);
@@ -144,7 +181,7 @@ void CMainFrame::RecalcLayout(BOOL bNotify)
 	if (first != NULL && numwnds > 0) {
 		wndnum = 0, wnd = first;
 		while (1) {
-			if (wnd->m_hWnd != m_toolbar.m_hWnd) {
+			if (wnd->m_hWnd != m_toolbar.m_hWnd && wnd->m_hWnd != m_scanNoticeButton.m_hWnd) {
 				wnd->SetWindowPos(NULL, rectBorder.left + (width * wndnum) / numwnds, rectBorder.top,
 					(width * (wndnum+1)) / numwnds - (width * wndnum) / numwnds,
 					rectBorder.bottom - rectBorder.top,
@@ -156,6 +193,49 @@ void CMainFrame::RecalcLayout(BOOL bNotify)
 	}
 
 	m_bInRecalcLayout = FALSE;
+}
+
+void CMainFrame::SetScanNotice(ui64 skippedDirectories, DWORD firstError,
+	const std::vector<std::wstring>& paths)
+{
+	m_scanNotice.Set(skippedDirectories, firstError);
+	m_skippedPaths = paths;
+
+	CString text;
+	text.Format(CurLang->scan_partial_button_format, skippedDirectories);
+	m_scanNoticeButton.SetWindowText(text);
+	m_scanNoticeButton.EnableWindow(TRUE);
+	m_scanNoticeButton.ShowWindow(SW_SHOWNORMAL);
+	RecalcLayout(0);
+}
+
+void CMainFrame::ClearScanNotice(void)
+{
+	m_scanNotice.Clear();
+	m_skippedPaths.clear();
+	if (::IsWindow(m_scanNoticeButton.m_hWnd)) {
+		m_scanNoticeButton.EnableWindow(FALSE);
+		m_scanNoticeButton.ShowWindow(SW_HIDE);
+		RecalcLayout(0);
+	}
+}
+
+void CMainFrame::OnScanNoticeClicked()
+{
+	if (!m_scanNotice.IsVisible()) return;
+	CScanDetailsDialog dialog(m_scanNotice.skippedDirectories, m_skippedPaths, this);
+	dialog.DoModal();
+}
+
+LRESULT CMainFrame::OnScanNoticeClickedMessage(WPARAM wParam, LPARAM lParam)
+{
+	OnScanNoticeClicked();
+	return 0;
+}
+
+void CMainFrame::OnScanNoticeUpdate(CCmdUI *ui)
+{
+	ui->Enable(m_scanNotice.IsVisible());
 }
 
 void CMainFrame::OnSysCommand(UINT nid, LPARAM lparam)

@@ -13,6 +13,7 @@
 #define IDB_SCAN4                       117
 #define IDD_INFO_BAR                    118
 #define IDD_SETTINGS                    119
+#define IDD_SCAN_DETAILS                120
 #define IDB_BITMAP1                     123
 #define IDR_TOOLBAR_EN                  200
 #define IDR_TOOLBAR_FR                  201
@@ -81,6 +82,10 @@
 #define IDC_STATIC_MAINTAINER           1045
 #define IDC_PROJECT_WEBSITE             1046
 #define IDC_REPORT_BUG                  1047
+#define IDC_SCAN_NOTICE                 1048
+#define IDC_SCAN_DETAILS_SUMMARY        1049
+#define IDC_SCAN_DETAILS_LIST           1050
+#define IDC_SCAN_DETAILS_COPY           1051
 #define ID_FILE_REFRESH                 40002
 #define ID_VIEW_FREE                    40003
 #define ID_VIEW_ZOOM_IN                 40004
@@ -97,7 +102,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        124
 #define _APS_NEXT_COMMAND_VALUE         40019
-#define _APS_NEXT_CONTROL_VALUE         1048
+#define _APS_NEXT_CONTROL_VALUE         1052
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

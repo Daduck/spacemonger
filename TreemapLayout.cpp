@@ -41,6 +41,7 @@ static void AddNode(
 	if (c == L'*' || c == L'<' || c == L'>' || c == L'?' || c == L'|') {
 		node.depth = -1;
 		flags |= TREEMAP_FLAG_SPECIAL;
+		if (c == L'|') flags |= TREEMAP_FLAG_UNAVAILABLE;
 	} else {
 		node.depth = depth;
 	}
@@ -231,7 +232,7 @@ const TreemapNode* TreemapEngine::HitTestItem(
 		}
 	}
 
-	if (best != nullptr && (best->name == nullptr || best->name[0] == L'<')) {
+	if (best != nullptr && (best->name == nullptr || best->IsSpecial())) {
 		best = nullptr;
 	}
 

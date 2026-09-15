@@ -11,6 +11,7 @@ enum TreemapNodeFlags : ui32 {
 	TREEMAP_FLAG_FOLDER   = (1 << 0), // 1: Node represents a folder
 	TREEMAP_FLAG_SPECIAL  = (1 << 1), // 2: Special block (e.g. Free Space)
 	TREEMAP_FLAG_HOVER    = (1 << 2), // 4: Mouse hover highlight
+	TREEMAP_FLAG_UNAVAILABLE = (1 << 3), // 8: Estimated unaccounted space
 };
 
 struct TreemapNode {

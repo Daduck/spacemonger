@@ -2,8 +2,10 @@
 #include "spacemonger.h"
 #include "FolderTree.h"
 #include "FolderView.h"
+#include "MainFrm.h"
 #include "AsyncScanEngine.h"
 #include "PathUtil.h"
+#include "ScanAccounting.h"
 #include "Lang.h"
 #include <cmath>
 
@@ -25,6 +27,9 @@ BOOL CFolderTree::LoadTree(const CString &path, BOOL includespace, CWnd *modalwi
 
 	if (path == "") return 1;
 
+	CMainFrame *frame = (CMainFrame *)theApp.m_mainframe;
+	if (frame != NULL && ::IsWindow(frame->m_hWnd)) frame->ClearScanNotice();
+
 	dialog.Create(IDD_SCAN_DIALOG, modalwin);
 	dialog.Reset();
 
@@ -38,6 +43,9 @@ BOOL CFolderTree::LoadTree(const CString &path, BOOL includespace, CWnd *modalwi
 	std::wstring widePath = PathUtil::AnsiToWide((LPCTSTR)path);
 	std::wstring absPath = PathUtil::GetAbsolutePath(widePath);
 	absPath = PathUtil::EnsureTrailingBackslash(absPath);
+	wchar_t volumePath[MAX_PATH] = { 0 };
+	bool isVolumeRoot = GetVolumePathNameW(absPath.c_str(), volumePath, _countof(volumePath))
+		&& _wcsicmp(absPath.c_str(), volumePath) == 0;
 	std::wstring preparedPath = PathUtil::PrepareLongPath(absPath);
 	preparedPath = PathUtil::EnsureTrailingBackslash(preparedPath);
 	BOOL aligned = (clustersize != 0 && (clustersize & (clustersize - 1)) == 0);
@@ -164,13 +172,29 @@ BOOL CFolderTree::LoadTree(const CString &path, BOOL includespace, CWnd *modalwi
 		return 0;
 	}
 
+	ui64 unaccountedSpace = ComputeUnaccountedSpace(usedspace, filespace);
+	if (resultProgress.isPartial && isVolumeRoot && unaccountedSpace > 0) {
+		std::wstring unavailableName = L"|";
+		unavailableName += PathUtil::AnsiToWide(CurLang->scan_unavailable);
+		if (!root->AddFileWithArena(nameArena, unavailableName.c_str(),
+			(ui32)unavailableName.size(), unaccountedSpace, unaccountedSpace, 0)) {
+			delete root;
+			nameArena.Reset();
+			root = cur = NULL;
+			freespace = usedspace = totalspace = 0;
+			m_path = "";
+			dialog.DestroyWindow();
+			return 0;
+		}
+	}
+
 	root->Finalize();
 	dialog.DestroyWindow();
 	if (resultProgress.isPartial) {
-		CString message;
-		message.Format(CurLang->scan_partial_format,
-			resultProgress.skippedDirectories, resultProgress.firstError);
-		AfxMessageBox(message, MB_OK | MB_ICONEXCLAMATION);
+		if (frame != NULL && ::IsWindow(frame->m_hWnd)) {
+			frame->SetScanNotice(resultProgress.skippedDirectories,
+				resultProgress.firstError, engine.GetSkippedDirectories());
+		}
 	}
 
 	if (modalwin != NULL && ::IsWindow(modalwin->m_hWnd)) {

@@ -26,6 +26,8 @@ enable_testing()
 
 set(SPACEMONGER_SOURCES
   AboutDialog.cpp
+  ScanDetailsDialog.cpp
+  ScanAccounting.h
   AsyncScanEngine.cpp
   DriveDialog.cpp
   DiskUsage.cpp
@@ -147,6 +149,30 @@ set_target_properties(TipWndText_test PROPERTIES
   MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
 )
 add_test(NAME TipWndText_test COMMAND TipWndText_test)
+
+add_executable(ScanNotice_test
+  tests/ScanNotice_test.cpp
+  ScanNotice.h
+)
+target_include_directories(ScanNotice_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(ScanNotice_test PRIVATE WIN32 _WINDOWS _MBCS)
+target_compile_options(ScanNotice_test PRIVATE /W3 /EHsc)
+set_target_properties(ScanNotice_test PROPERTIES
+  MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+)
+add_test(NAME ScanNotice_test COMMAND ScanNotice_test)
+
+add_executable(ScanAccounting_test
+  tests/ScanAccounting_test.cpp
+  ScanAccounting.h
+)
+target_include_directories(ScanAccounting_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(ScanAccounting_test PRIVATE WIN32 _WINDOWS _MBCS)
+target_compile_options(ScanAccounting_test PRIVATE /W3 /EHsc)
+set_target_properties(ScanAccounting_test PROPERTIES
+  MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+)
+add_test(NAME ScanAccounting_test COMMAND ScanAccounting_test)
 
 add_executable(AsyncScan_test
   tests/AsyncScan_test.cpp

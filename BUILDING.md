@@ -56,7 +56,7 @@ Open the folder and select your desired CMake configure preset (`vs2022-x64`, `v
 ## Validation coverage
 
 CMake explicitly requires C++17. CI builds Debug and Release for Win32, x64,
-and ARM64, and runs the nine CTest executables on Win32 and x64. ARM64 tests
+and ARM64, and runs the eleven CTest executables on Win32 and x64. ARM64 tests
 require a compatible runtime and are not currently executed by CI.
 
 Scanner regression tests create temporary directories, including an access-denied

@@ -15,7 +15,9 @@ No installer or companion files are required.
 The build explicitly selects C++17. Filesystem enumeration uses wide Windows
 APIs; parts of the MFC UI still use ANSI text. Live updates run at most every
 250 ms and skip unchanged scans. Failed roots are reported as errors;
-unreadable or depth-limited subtrees produce a partial-result warning.
+unreadable or depth-limited subtrees produce a non-modal partial-result notice.
+Partial whole-drive scans also show an “Unavailable (estimate)” treemap block
+for the unaccounted volume-used space.
 
 Historical implementation records:
 
