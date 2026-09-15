@@ -290,8 +290,8 @@ IDR_TOOLBAR_FR          BITMAP  DISCARDABLE     "res\\toolbar_fr.bmp"
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,4,3,0
- PRODUCTVERSION 1,4,3,0
+ FILEVERSION 1,4,4,0
+ PRODUCTVERSION 1,4,4,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -309,14 +309,14 @@ BEGIN
             VALUE "Comments", "Visit https://andedammen.dk/spacemonger for the latest version\0"
             VALUE "CompanyName", "65 Systems\0"
             VALUE "FileDescription", "SpaceMonger Program File\0"
-            VALUE "FileVersion", "1, 4, 3, 0\0"
+            VALUE "FileVersion", "1, 4, 4, 0\0"
             VALUE "InternalName", "SpaceMonger\0"
             VALUE "LegalCopyright", "Copyright (C) 1997-2000 Sean Werkema, (C) 2026 Johnny J. Andersen\0"
             VALUE "LegalTrademarks", "\0"
             VALUE "OriginalFilename", "SpaceMonger.exe\0"
             VALUE "PrivateBuild", "\0"
             VALUE "ProductName", "SpaceMonger\0"
-            VALUE "ProductVersion", "1, 4, 3, 0\0"
+            VALUE "ProductVersion", "1, 4, 4, 0\0"
             VALUE "SpecialBuild", "\0"
         END
     END
