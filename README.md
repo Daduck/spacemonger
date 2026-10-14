@@ -12,9 +12,11 @@ No installer or companion files are required.
 - [Backlog and architectural decisions](BACKLOG.md): priorities and distribution/UI constraints.
 - [License](LICENSE.txt).
 
-The build explicitly selects C++17. Filesystem enumeration uses wide Windows
-APIs; parts of the MFC UI still use ANSI text. Live updates run at most every
-250 ms and skip unchanged scans. Failed roots are reported as errors;
+The build explicitly selects C++17 and Unicode. Filesystem paths and names
+remain wide strings through the MFC UI and Windows shell actions. Treemap names
+keep the classic Small Fonts face where it supports their characters and use
+an installed Unicode font for unsupported scripts. Live updates run at most
+every 250 ms and skip unchanged scans. Failed roots are reported as errors;
 unreadable or depth-limited subtrees produce a non-modal partial-result notice.
 Partial whole-drive scans also show an “Unavailable (estimate)” treemap block
 for the unaccounted volume-used space.

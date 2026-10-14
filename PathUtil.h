@@ -12,31 +12,20 @@
 
 namespace PathUtil {
 
-// Helper to convert ANSI/MBCS string to Wide string using CP_ACP
-std::wstring AnsiToWide(const std::string& str);
-
-// Helper to convert Wide string to ANSI/MBCS string using CP_ACP
-std::string WideToAnsi(const std::wstring& wstr);
-
 // Normalizes path separators to backslashes
-std::string NormalizeSeparators(const std::string& path);
 std::wstring NormalizeSeparators(const std::wstring& path);
 
 // Combines two path components, ensuring exactly one backslash separator
-std::string Join(const std::string& base, const std::string& extra);
 std::wstring Join(const std::wstring& base, const std::wstring& extra);
 
 // Ensures the path ends with a trailing backslash
-std::string EnsureTrailingBackslash(const std::string& path);
 std::wstring EnsureTrailingBackslash(const std::wstring& path);
 
 // Resolves a relative path to a full absolute path using GetFullPathNameW
 std::wstring GetAbsolutePath(const std::wstring& path);
-std::wstring GetAbsolutePath(const std::string& path);
 
 // Converts a path into a long-path-safe wide string (prefixed with \\?\ if appropriate)
 std::wstring PrepareLongPath(const std::wstring& path);
-std::wstring PrepareLongPath(const std::string& path);
 
 // Converts long-path-prefixed paths back to ordinary Win32 shell paths.
 std::wstring RemoveLongPathPrefix(const std::wstring& path);
@@ -44,8 +33,8 @@ std::wstring RemoveLongPathPrefix(const std::wstring& path);
 // Appends one path component and returns the path length before appending.
 std::wstring::size_type AppendComponent(std::wstring& path, const wchar_t *component);
 
-// Builds a wide path from the app's MBCS root plus wide scanner path parts.
-std::wstring BuildWidePath(const char *root, const std::wstring& relativePath, const wchar_t *leafName);
+// Builds a wide path from the app root and wide scanner path parts.
+std::wstring BuildWidePath(const wchar_t *root, const std::wstring& relativePath, const wchar_t *leafName);
 
 } // namespace PathUtil
 

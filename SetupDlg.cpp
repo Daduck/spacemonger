@@ -77,7 +77,7 @@ void CSettingsDialog::OnOK(void)
 	if (nametipdelay != NULL) {
 		CString string;
 		nametipdelay->GetWindowText(string);
-		theApp.m_settings.nametip_delay = atoi(string);
+		theApp.m_settings.nametip_delay = _wtoi(string);
 	}
 
 	if ((tip = (CButton *)GetDlgItem(IDC_INFOTIP_PATH)) != NULL && tip->GetCheck())
@@ -96,7 +96,7 @@ void CSettingsDialog::OnOK(void)
 	if (infotipdelay != NULL) {
 		CString string;
 		infotipdelay->GetWindowText(string);
-		theApp.m_settings.infotip_delay = atoi(string);
+		theApp.m_settings.infotip_delay = _wtoi(string);
 	}
 
 	CDialog::OnOK();
@@ -273,13 +273,13 @@ void CSettingsDialog::UpdateDialogForNewLanguage(void)
 	CEdit *tipdelay = (CEdit *)GetDlgItem(IDC_NAMETIP_DELAY);
 	if (tipdelay != NULL) {
 		CString string;
-		string.Format("%u", theApp.m_settings.nametip_delay);
+		string.Format(L"%u", theApp.m_settings.nametip_delay);
 		tipdelay->SetWindowText(string);
 	}
 	tipdelay = (CEdit *)GetDlgItem(IDC_INFOTIP_DELAY);
 	if (tipdelay != NULL) {
 		CString string;
-		string.Format("%u", theApp.m_settings.infotip_delay);
+		string.Format(L"%u", theApp.m_settings.infotip_delay);
 		tipdelay->SetWindowText(string);
 	}
 	EnableNameTipButtons(theApp.m_settings.show_name_tips);

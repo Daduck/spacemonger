@@ -11,31 +11,12 @@
 		} \
 	} while (0)
 
-int test_ansi_wide_conversion() {
-	std::string ansi = "C:\\Windows\\System32";
-	std::wstring wide = PathUtil::AnsiToWide(ansi);
-	CHECK(wide == L"C:\\Windows\\System32");
-
-	std::string ansi_back = PathUtil::WideToAnsi(wide);
-	CHECK(ansi_back == ansi);
-	return 1;
-}
-
 int test_normalize_separators() {
-	CHECK(PathUtil::NormalizeSeparators("C:/foo/bar") == "C:\\foo\\bar");
-	CHECK(PathUtil::NormalizeSeparators("C:\\foo/bar") == "C:\\foo\\bar");
 	CHECK(PathUtil::NormalizeSeparators(L"C:/foo/bar") == L"C:\\foo\\bar");
 	return 1;
 }
 
 int test_join() {
-	CHECK(PathUtil::Join("C:\\foo", "bar") == "C:\\foo\\bar");
-	CHECK(PathUtil::Join("C:\\foo\\", "bar") == "C:\\foo\\bar");
-	CHECK(PathUtil::Join("C:\\foo", "\\bar") == "C:\\foo\\bar");
-	CHECK(PathUtil::Join("C:\\foo\\", "\\bar") == "C:\\foo\\bar");
-	CHECK(PathUtil::Join("", "bar") == "bar");
-	CHECK(PathUtil::Join("C:\\foo", "") == "C:\\foo");
-
 	CHECK(PathUtil::Join(L"C:\\foo", L"bar") == L"C:\\foo\\bar");
 	CHECK(PathUtil::Join(L"C:\\foo\\", L"bar") == L"C:\\foo\\bar");
 	CHECK(PathUtil::Join(L"C:\\foo", L"\\bar") == L"C:\\foo\\bar");
@@ -43,10 +24,6 @@ int test_join() {
 }
 
 int test_ensure_trailing_backslash() {
-	CHECK(PathUtil::EnsureTrailingBackslash("C:\\foo") == "C:\\foo\\");
-	CHECK(PathUtil::EnsureTrailingBackslash("C:\\foo\\") == "C:\\foo\\");
-	CHECK(PathUtil::EnsureTrailingBackslash("") == "\\");
-
 	CHECK(PathUtil::EnsureTrailingBackslash(L"C:\\foo") == L"C:\\foo\\");
 	return 1;
 }
@@ -71,11 +48,9 @@ int test_prepare_long_path() {
 
 	// Local path
 	CHECK(PathUtil::PrepareLongPath(L"C:\\foo\\bar") == L"\\\\?\\C:\\foo\\bar");
-	CHECK(PathUtil::PrepareLongPath("C:\\foo\\bar") == L"\\\\?\\C:\\foo\\bar");
 
 	// UNC path
 	CHECK(PathUtil::PrepareLongPath(L"\\\\server\\share\\file") == L"\\\\?\\UNC\\server\\share\\file");
-	CHECK(PathUtil::PrepareLongPath("\\\\server\\share\\file") == L"\\\\?\\UNC\\server\\share\\file");
 	return 1;
 }
 
@@ -108,14 +83,14 @@ int test_append_component_adds_separator_when_needed() {
 }
 
 int test_build_wide_path_preserves_non_ascii_name() {
-	std::wstring path = PathUtil::BuildWidePath("C:\\root", L"subfolder\\", L"f\u00F8.txt");
+	std::wstring path = PathUtil::BuildWidePath(L"C:\\root", L"subfolder\\", L"f\u00F8.txt");
 
 	CHECK(path == L"C:\\root\\subfolder\\f\u00F8.txt");
 	return 1;
 }
 
 int test_prepare_built_wide_path_adds_long_path_prefix() {
-	std::wstring path = PathUtil::BuildWidePath("C:\\root\\", L"", L"child.txt");
+	std::wstring path = PathUtil::BuildWidePath(L"C:\\root\\", L"", L"child.txt");
 	std::wstring prepared = PathUtil::PrepareLongPath(path);
 
 	CHECK(prepared == L"\\\\?\\C:\\root\\child.txt");
@@ -124,7 +99,7 @@ int test_prepare_built_wide_path_adds_long_path_prefix() {
 
 int test_prepare_long_path_preserves_long_components() {
 	std::wstring component(280, L'x');
-	std::wstring path = PathUtil::BuildWidePath("C:\\root", component, L"child.txt");
+	std::wstring path = PathUtil::BuildWidePath(L"C:\\root", component, L"child.txt");
 	std::wstring prepared = PathUtil::PrepareLongPath(path);
 
 	CHECK(path.size() > MAX_PATH);
@@ -133,7 +108,6 @@ int test_prepare_long_path_preserves_long_components() {
 }
 
 int main() {
-	if (!test_ansi_wide_conversion()) return 1;
 	if (!test_normalize_separators()) return 1;
 	if (!test_join()) return 1;
 	if (!test_ensure_trailing_backslash()) return 1;

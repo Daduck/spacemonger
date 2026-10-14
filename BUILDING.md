@@ -55,13 +55,16 @@ Open the folder and select your desired CMake configure preset (`vs2022-x64`, `v
 
 ## Validation coverage
 
-CMake explicitly requires C++17. CI builds Debug and Release for Win32, x64,
-and ARM64, and runs the eleven CTest executables on Win32 and x64. ARM64 tests
-require a compatible runtime and are not currently executed by CI.
+CMake explicitly requires C++17 and builds the MFC application as Unicode
+(`UNICODE` and `_UNICODE`) with static MFC and the static runtime. CI builds
+Debug and Release for Win32, x64, and ARM64, and runs the twelve CTest
+executables on Win32 and x64. ARM64 tests require a compatible runtime and are
+not currently executed by CI.
 
-Scanner regression tests create temporary directories, including an access-denied
-fixture whose permissions are restored before cleanup. They cover missing and
-empty roots, partial scans, cancellation, snapshot lifetime, and allocation failure.
+Scanner regression tests create temporary directories, including a Unicode-named
+folder and files checked for exact names, and an access-denied fixture whose
+permissions are restored before cleanup. They cover missing and empty roots,
+partial scans, cancellation, snapshot lifetime, and allocation failure.
 Run with a bounded timeout when investigating hangs:
 
 ```powershell

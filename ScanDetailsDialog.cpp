@@ -31,8 +31,7 @@ BOOL CScanDetailsDialog::OnInitDialog()
 	CListBox *list = (CListBox *)GetDlgItem(IDC_SCAN_DETAILS_LIST);
 	if (list != NULL) {
 		for (const auto& path : m_paths) {
-			std::string display = PathUtil::WideToAnsi(path);
-			list->AddString(display.c_str());
+			list->AddString(path.c_str());
 		}
 	}
 

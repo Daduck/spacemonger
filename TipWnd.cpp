@@ -12,12 +12,12 @@ static char THIS_FILE[] = __FILE__;
 
 /***************************************************************************/
 
-#define CLASSNAME "TipWnd"
+#define CLASSNAME L"TipWnd"
 
 struct TipWndInfo {
 	HICON icon;
 	int flags;
-	char *text;
+	wchar_t *text;
 	int textlen;
 	HFONT font;
 	COLORREF bgcolor;
@@ -77,7 +77,7 @@ static void ComputeTextExtents(HDC dc, TipWndInfo *info, SIZE *size)
 {
 	// Scan the text to determine the longest line (in pixels) and the
 	// total height in pixels.
-	const char *start, *end;
+	const wchar_t *start, *end;
 	int maxlen = 0, height = 0;
 	SIZE linesize;
 	TEXTMETRIC tm;
@@ -85,14 +85,14 @@ static void ComputeTextExtents(HDC dc, TipWndInfo *info, SIZE *size)
 
 	start = info->text;
 	if (start != NULL) {
-		while (*start != '\0') {
+		while (*start != L'\0') {
 			end = start;
-			while (*end != '\0' && *end != '\n') end++;
+			while (*end != L'\0' && *end != L'\n') end++;
 			linesize.cx = linesize.cy = 0;
-			::GetTextExtentPoint32(dc, start, (int)(end-start), &linesize);
+			::GetTextExtentPoint32W(dc, start, (int)(end-start), &linesize);
 			height += tm.tmAscent + tm.tmDescent;
 			if (linesize.cx > maxlen) maxlen = linesize.cx;
-			if (*end == '\n') end++;
+			if (*end == L'\n') end++;
 			start = end;
 		}
 	}
@@ -106,20 +106,20 @@ static void DrawMultilineText(HDC dc, TipWndInfo *info, POINT *point)
 
 	// Scan the text to determine the longest line (in pixels) and the
 	// total height in pixels.
-	const char *start, *end;
+	const wchar_t *start, *end;
 	SIZE linesize;
 	TEXTMETRIC tm;
 	::GetTextMetrics(dc, &tm);
 
 	start = info->text;
 	if (start != NULL) {
-		while (*start != '\0') {
+		while (*start != L'\0') {
 			end = start;
-			while (*end != '\0' && *end != '\n') end++;
+			while (*end != L'\0' && *end != L'\n') end++;
 			linesize.cx = linesize.cy = 0;
-			::TextOut(dc, point->x, point->y, start, (int)(end-start));
+			::TextOutW(dc, point->x, point->y, start, (int)(end-start));
 			point->y += tm.tmAscent + tm.tmDescent;
-			if (*end == '\n') end++;
+			if (*end == L'\n') end++;
 			start = end;
 		}
 	}
@@ -290,15 +290,15 @@ static LRESULT CALLBACK TipWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 		return 0;
 
 	case WM_SETTEXT:
-		if ((const char *)lParam == NULL) lParam = (LPARAM)"<null>";
+		if ((const wchar_t *)lParam == NULL) lParam = (LPARAM)L"<null>";
 		if (info->text != NULL) {
-			if (!strcmp(info->text, (const char *)lParam)) return 0;
+			if (!wcscmp(info->text, (const wchar_t *)lParam)) return 0;
 			free(info->text);
 		}
-		info->textlen = (int)strlen((const char *)lParam);
-		info->text = (char *)malloc(info->textlen+1);
+		info->textlen = (int)wcslen((const wchar_t *)lParam);
+		info->text = (wchar_t *)malloc((info->textlen+1) * sizeof(wchar_t));
 		if (info->text) {
-			strcpy_s(info->text, info->textlen+1, (const char *)lParam);
+			wcscpy_s(info->text, info->textlen+1, (const wchar_t *)lParam);
 		} else {
 			info->textlen = 0;
 		}
@@ -306,7 +306,7 @@ static LRESULT CALLBACK TipWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 		return 0;
 
 	case WM_GETTEXT:
-		return (LRESULT)SM_CopyTipText((char *)lParam, (size_t)wParam, info->text);
+		return (LRESULT)SM_CopyTipText((wchar_t *)lParam, (size_t)wParam, info->text);
 
 	case WM_GETTEXTLENGTH:
 		return (LRESULT)info->textlen;
@@ -609,9 +609,9 @@ static LRESULT CALLBACK TipWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 			HWND wnd = ::WindowFromPoint(point);
 			// If the window the mouse is over is a TipWnd, then the mouse is
 			// really just over that TipWnd's owner.
-			char cname[32];
-			::GetClassName(wnd, cname, 31);
-			if (!strcmp(cname, CLASSNAME))
+			wchar_t cname[32];
+			::GetClassNameW(wnd, cname, _countof(cname));
+			if (!wcscmp(cname, CLASSNAME))
 				wnd = (HWND)::SendMessage(wnd, WM_COMMAND, TW_GET_OWNER, 0);
 			// If the mouse has moved out of this TipWnd's owner, hide the TipWnd.
 			if (wnd != info->owner) {
@@ -656,14 +656,14 @@ void WINAPI ::InitTipWnd(HINSTANCE inst)
 	wc.style = CS_VREDRAW|CS_HREDRAW|CS_SAVEBITS;
 	wc.lpfnWndProc = TipWndProc;
 
-	::RegisterClassEx(&wc);
+	::RegisterClassExW(&wc);
 
 	initted = 1;
 }
 
 HWND WINAPI ::CreateTipWnd(HWND owner, const RECT *rect, BOOL showwnd)
 {
-	HWND hwnd = ::CreateWindowEx(WS_EX_TOPMOST, CLASSNAME, "", WS_POPUP,
+	HWND hwnd = ::CreateWindowExW(WS_EX_TOPMOST, CLASSNAME, L"", WS_POPUP,
 		rect->left, rect->top, rect->right-rect->left, rect->bottom-rect->top,
 		owner, NULL, theInst, NULL);
 	TipWndInfo *info = (TipWndInfo *)::GetWindowLongPtr(hwnd, GWLP_USERDATA);
@@ -672,7 +672,7 @@ HWND WINAPI ::CreateTipWnd(HWND owner, const RECT *rect, BOOL showwnd)
 }
 
 HWND WINAPI ::CreateTipWndEz(HWND owner, int x, int y,
-	const char *text, HICON icon, BOOL showwnd)
+	const wchar_t *text, HICON icon, BOOL showwnd)
 {
 	POINT point;
 	point.x = x, point.y = y;
@@ -715,7 +715,7 @@ CTipWnd::~CTipWnd()
 BOOL CTipWnd::Create(CWnd *owner, const RECT &rect, BOOL showwnd)
 {
 	CWnd *pWnd = this;
-	if (!pWnd->CreateEx(WS_EX_TOPMOST, _T(CLASSNAME), _T(""), WS_POPUP, rect, owner, 0, NULL))
+	if (!pWnd->CreateEx(WS_EX_TOPMOST, CLASSNAME, L"", WS_POPUP, rect, owner, 0, NULL))
 		return 0;
 	TipWndInfo *info = (TipWndInfo *)::GetWindowLongPtr(m_hWnd, GWLP_USERDATA);
 	if (info != NULL) info->owner = owner->m_hWnd;
