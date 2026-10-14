@@ -1,7 +1,7 @@
 #include "../TipWndText.h"
 
 #include <stdio.h>
-#include <string.h>
+#include <wchar.h>
 
 #define CHECK(condition) \
 	do { \
@@ -13,29 +13,29 @@
 
 static int copies_full_text_and_reports_length()
 {
-	char buffer[16];
+	wchar_t buffer[16];
 
-	CHECK(SM_CopyTipText(buffer, sizeof(buffer), "hello") == 5);
-	CHECK(strcmp(buffer, "hello") == 0);
+	CHECK(SM_CopyTipText(buffer, sizeof(buffer) / sizeof(buffer[0]), L"hello") == 5);
+	CHECK(wcscmp(buffer, L"hello") == 0);
 	return 1;
 }
 
 static int truncates_text_to_fit_and_reports_copied_length()
 {
-	char buffer[5];
+	wchar_t buffer[5];
 
-	CHECK(SM_CopyTipText(buffer, sizeof(buffer), "hello") == 4);
-	CHECK(strcmp(buffer, "hell") == 0);
+	CHECK(SM_CopyTipText(buffer, sizeof(buffer) / sizeof(buffer[0]), L"hello") == 4);
+	CHECK(wcscmp(buffer, L"hell") == 0);
 	return 1;
 }
 
 static int empty_and_zero_capacity_destinations_are_safe()
 {
-	char buffer[1] = {'x'};
+	wchar_t buffer[1] = {L'x'};
 
 	CHECK(SM_CopyTipText(buffer, sizeof(buffer), NULL) == 0);
-	CHECK(buffer[0] == '\0');
-	CHECK(SM_CopyTipText(NULL, 0, "hello") == 0);
+	CHECK(buffer[0] == L'\0');
+	CHECK(SM_CopyTipText(NULL, 0, L"hello") == 0);
 	return 1;
 }
 

@@ -5,7 +5,6 @@ incremental modernization rather than a full rewrite.
 
 ## Next
 
-- [ ] Complete the Unicode UI migration described below.
 - [ ] Benchmark live-layout mutex hold time and scan throughput before implementing incremental size propagation.
 - [ ] Resolve existing x64 conversion warnings in DriveDialog.cpp and Freedoc.cpp.
 - [ ] Verify failed/partial-scan dialogs, cancellation, and mixed-DPI behavior interactively.
@@ -40,8 +39,8 @@ incremental modernization rather than a full rewrite.
       Implemented in TreemapLayout.cpp with headless layout and hit-testing regression coverage.
 - [x] Replace fixed-size buffers and unsafe formatting calls in narrow passes.
 - [ ] Decide whether unused `CFolder` mutation methods (`DelFile`, `RenameFile`, `FindFile`) should be implemented or removed.
-- [ ] **Full Unicode Migration (`_UNICODE` / `UNICODE`)**
-      *Background:* The app target currently builds with `_MBCS`. Although the internal filesystem scanner was upgraded to wide Win32 APIs (`WIN32_FIND_DATAW`, `std::wstring`), the MFC application shell, dialogs, settings, and tooltips still operate in ANSI mode with repeated `PathUtil::WideToAnsi` and `AnsiToWide` conversions. Migrating the entire target to `UNICODE` / `_UNICODE` eliminates conversion overhead, ensures native `CStringW` handling throughout, and prevents character corruption when viewing non-ASCII / foreign file paths.
+- [x] **Full Unicode Migration (`_UNICODE` / `UNICODE`)**
+      The app and test targets now build with `UNICODE` / `_UNICODE`; paths, scan progress/details, treemap titles and tooltips, drive labels, dialogs, and shell operations use wide strings and APIs. Added a filesystem-backed scanner regression using CJK, Greek, and Cyrillic names. Registry value names remain compatible, and the existing two-letter language preference stays an ANSI value to preserve its stored format.
 - [x] Investigate C++ exceptions occasionally thrown in `FolderView` layout calculation for degenerate aspect ratios.
 
 ## Performance Optimizations

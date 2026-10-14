@@ -78,11 +78,14 @@ protected:
 	void AnimateBox(const CRect &start, const CRect &end);
 	void SetupInfoTip(const TreemapNode *cur);
 	void SetupNameTip(const TreemapNode *cur);
+	void SetNameTipFont(HFONT font);
 
 protected:
 	CPalette m_palette;
 	CBrush black, white;
 	CFont minifont;
+	std::vector<HFONT> m_unicodeFonts;
+	HFONT m_nameTipFontChoice;
 	CFolder *rootfolder;
 	std::vector<TreemapNode> m_layoutNodes;
 	// Owns the name strings referenced by live-scan layout nodes, so the

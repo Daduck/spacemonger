@@ -79,7 +79,7 @@ BOOL CSpaceMonger::InitInstance()
 
 	// Create the main window
 	m_mainframe = new CMainFrame;
-	m_mainframe->CFrameWnd::Create(NULL, "SpaceMonger", WS_OVERLAPPEDWINDOW, rect);
+	m_mainframe->CFrameWnd::Create(NULL, L"SpaceMonger", WS_OVERLAPPEDWINDOW, rect);
 	m_pMainWnd = m_mainframe;
 
 	// Create the one and only document
@@ -101,7 +101,7 @@ BOOL CSpaceMonger::InitInstance()
 			MAKEINTRESOURCE(anim_name[i]), IMAGE_BITMAP, 128, 48,
 			LR_LOADTRANSPARENT|LR_LOADMAP3DCOLORS);
 
-	m_mainframe->SetWindowText("SpaceMonger");
+	m_mainframe->SetWindowText(L"SpaceMonger");
 	m_mainframe->ShowWindow(showcmd);
 	m_mainframe->UpdateWindow();
 	m_mainframe->RecalcLayout();
@@ -132,7 +132,7 @@ void CSpaceMonger::OnFileOpen(void)
 	if (drive == -1) return;
 
 	CFolderTree *ft = (CFolderTree *)m_document;
-	ft->m_path.Format("%c:\\", (char)(drive + 'A'));
+	ft->m_path.Format(L"%c:\\", (wchar_t)(drive + 'A'));
 	OnFileRefresh();
 }
 
@@ -162,7 +162,7 @@ void CSpaceMonger::OnFileRun(void)
 	std::wstring path = fv->BuildContainerPathW(fv->selected);
 
 	if ((INT_PTR)ShellExecuteW(NULL, NULL, title.c_str(), NULL, path.c_str(), SW_SHOWDEFAULT) <= 32)
-		AfxMessageBox("Windows failed to open file.");
+		AfxMessageBox(L"Windows failed to open file.");
 }
 
 static HRESULT DeleteShellItem(const std::wstring& path, HWND owner)
@@ -225,7 +225,7 @@ void CSpaceMonger::OnFileDelete(void)
 	else isfolder = 0;
 
 	if (FAILED(DeleteShellItem(title, m_mainframe->m_hWnd))) {
-		AfxMessageBox("Windows failed to delete file.");
+		AfxMessageBox(L"Windows failed to delete file.");
 		return;
 	}
 
@@ -307,7 +307,7 @@ void CSpaceMonger::OnFileProperties(void)
 	si.lpVerb = L"properties";
 	si.lpFile = path.c_str();
 	if (!ShellExecuteExW(&si))
-		AfxMessageBox("Windows failed to show file properties.");
+		AfxMessageBox(L"Windows failed to show file properties.");
 }
 
 void CSpaceMonger::OnAbout()
@@ -387,50 +387,50 @@ void CCurrentSettings::Load(void)
 {
 	HKEY key;
 	Reset();
-	if (RegOpenKey(HKEY_CURRENT_USER, "Software\\65\\SpaceMonger\\1.3", &key) != ERROR_SUCCESS)
+	if (RegOpenKey(HKEY_CURRENT_USER, L"Software\\65\\SpaceMonger\\1.3", &key) != ERROR_SUCCESS)
 		return;
 
 	DWORD size = sizeof(density);
 	DWORD type;
-	RegQueryValueEx(key, "density",				NULL, &type, (unsigned char *)&density, &size);
+	RegQueryValueEx(key, L"density",				NULL, &type, (unsigned char *)&density, &size);
 	size = sizeof(file_color);
-	RegQueryValueEx(key, "file_color",			NULL, &type, (unsigned char *)&file_color, &size);
+	RegQueryValueEx(key, L"file_color",			NULL, &type, (unsigned char *)&file_color, &size);
 	size = sizeof(folder_color);
-	RegQueryValueEx(key, "folder_color",		NULL, &type, (unsigned char *)&folder_color, &size);
+	RegQueryValueEx(key, L"folder_color",		NULL, &type, (unsigned char *)&folder_color, &size);
 	size = sizeof(auto_rescan);
-	RegQueryValueEx(key, "auto_rescan",			NULL, &type, (unsigned char *)&auto_rescan, &size);
+	RegQueryValueEx(key, L"auto_rescan",			NULL, &type, (unsigned char *)&auto_rescan, &size);
 	size = sizeof(animated_zoom);
-	RegQueryValueEx(key, "animated_zoom",		NULL, &type, (unsigned char *)&animated_zoom, &size);
+	RegQueryValueEx(key, L"animated_zoom",		NULL, &type, (unsigned char *)&animated_zoom, &size);
 	size = sizeof(disable_delete);
-	RegQueryValueEx(key, "disable_delete",		NULL, &type, (unsigned char *)&disable_delete, &size);
+	RegQueryValueEx(key, L"disable_delete",		NULL, &type, (unsigned char *)&disable_delete, &size);
 	size = sizeof(save_pos);
-	RegQueryValueEx(key, "save_pos",			NULL, &type, (unsigned char *)&save_pos, &size);
+	RegQueryValueEx(key, L"save_pos",			NULL, &type, (unsigned char *)&save_pos, &size);
 	size = sizeof(bias);
-	RegQueryValueEx(key, "bias",				NULL, &type, (unsigned char *)&bias, &size);
+	RegQueryValueEx(key, L"bias",				NULL, &type, (unsigned char *)&bias, &size);
 	size = sizeof(show_name_tips);
-	RegQueryValueEx(key, "show_name_tips",		NULL, &type, (unsigned char *)&show_name_tips, &size);
+	RegQueryValueEx(key, L"show_name_tips",		NULL, &type, (unsigned char *)&show_name_tips, &size);
 	size = sizeof(rollover_box);
-	RegQueryValueEx(key, "show_rollover_box",	NULL, &type, (unsigned char *)&rollover_box, &size);
+	RegQueryValueEx(key, L"show_rollover_box",	NULL, &type, (unsigned char *)&rollover_box, &size);
 	size = sizeof(show_info_tips);
-	RegQueryValueEx(key, "show_info_tips",		NULL, &type, (unsigned char *)&show_info_tips, &size);
+	RegQueryValueEx(key, L"show_info_tips",		NULL, &type, (unsigned char *)&show_info_tips, &size);
 	size = sizeof(nametip_delay);
-	RegQueryValueEx(key, "nametip_delay",		NULL, &type, (unsigned char *)&nametip_delay, &size);
+	RegQueryValueEx(key, L"nametip_delay",		NULL, &type, (unsigned char *)&nametip_delay, &size);
 	size = sizeof(infotip_flags);
-	RegQueryValueEx(key, "infotip_flags",		NULL, &type, (unsigned char *)&infotip_flags, &size);
+	RegQueryValueEx(key, L"infotip_flags",		NULL, &type, (unsigned char *)&infotip_flags, &size);
 	size = sizeof(infotip_delay);
-	RegQueryValueEx(key, "infotip_delay",		NULL, &type, (unsigned char *)&infotip_delay, &size);
+	RegQueryValueEx(key, L"infotip_delay",		NULL, &type, (unsigned char *)&infotip_delay, &size);
 	size = sizeof(rect.left);
-	RegQueryValueEx(key, "window_rect.left",	NULL, &type, (unsigned char *)&rect.left, &size);
+	RegQueryValueEx(key, L"window_rect.left",	NULL, &type, (unsigned char *)&rect.left, &size);
 	size = sizeof(rect.top);
-	RegQueryValueEx(key, "window_rect.top",		NULL, &type, (unsigned char *)&rect.top, &size);
+	RegQueryValueEx(key, L"window_rect.top",		NULL, &type, (unsigned char *)&rect.top, &size);
 	size = sizeof(rect.right);
-	RegQueryValueEx(key, "window_rect.right",	NULL, &type, (unsigned char *)&rect.right, &size);
+	RegQueryValueEx(key, L"window_rect.right",	NULL, &type, (unsigned char *)&rect.right, &size);
 	size = sizeof(rect.bottom);
-	RegQueryValueEx(key, "window_rect.bottom",	NULL, &type, (unsigned char *)&rect.bottom, &size);
+	RegQueryValueEx(key, L"window_rect.bottom",	NULL, &type, (unsigned char *)&rect.bottom, &size);
 	size = sizeof(showcmd);
-	RegQueryValueEx(key, "window_showcmd",		NULL, &type, (unsigned char *)&showcmd, &size);
+	RegQueryValueEx(key, L"window_showcmd",		NULL, &type, (unsigned char *)&showcmd, &size);
 	size = sizeof(lang);
-	RegQueryValueEx(key, "lang",				NULL, &type, (unsigned char *)&lang, &size);
+	RegQueryValueExA(key, "lang",				NULL, &type, (unsigned char *)&lang, &size);
 	RegCloseKey(key);
 
 	if (density < -3) density = -3;
@@ -513,48 +513,48 @@ void CCurrentSettings::Load(void)
 void CCurrentSettings::Save(void)
 {
 	HKEY key;
-	if (RegCreateKey(HKEY_CURRENT_USER, "Software\\65\\SpaceMonger\\1.3", &key) != ERROR_SUCCESS)
+	if (RegCreateKey(HKEY_CURRENT_USER, L"Software\\65\\SpaceMonger\\1.3", &key) != ERROR_SUCCESS)
 		return;
 	DWORD size;
 	size = sizeof(density);
-	RegSetValueEx(key, "density",			NULL, REG_DWORD, (unsigned char *)&density, size);
+	RegSetValueEx(key, L"density",			NULL, REG_DWORD, (unsigned char *)&density, size);
 	size = sizeof(file_color);
-	RegSetValueEx(key, "file_color",		NULL, REG_DWORD, (unsigned char *)&file_color, size);
+	RegSetValueEx(key, L"file_color",		NULL, REG_DWORD, (unsigned char *)&file_color, size);
 	size = sizeof(folder_color);
-	RegSetValueEx(key, "folder_color",		NULL, REG_DWORD, (unsigned char *)&folder_color, size);
+	RegSetValueEx(key, L"folder_color",		NULL, REG_DWORD, (unsigned char *)&folder_color, size);
 	size = sizeof(auto_rescan);
-	RegSetValueEx(key, "auto_rescan",		NULL, REG_DWORD, (unsigned char *)&auto_rescan, size);
+	RegSetValueEx(key, L"auto_rescan",		NULL, REG_DWORD, (unsigned char *)&auto_rescan, size);
 	size = sizeof(animated_zoom);
-	RegSetValueEx(key, "animated_zoom",		NULL, REG_DWORD, (unsigned char *)&animated_zoom, size);
+	RegSetValueEx(key, L"animated_zoom",		NULL, REG_DWORD, (unsigned char *)&animated_zoom, size);
 	size = sizeof(disable_delete);
-	RegSetValueEx(key, "disable_delete",	NULL, REG_DWORD, (unsigned char *)&disable_delete, size);
+	RegSetValueEx(key, L"disable_delete",	NULL, REG_DWORD, (unsigned char *)&disable_delete, size);
 	size = sizeof(save_pos);
-	RegSetValueEx(key, "save_pos",			NULL, REG_DWORD, (unsigned char *)&save_pos, size);
+	RegSetValueEx(key, L"save_pos",			NULL, REG_DWORD, (unsigned char *)&save_pos, size);
 	size = sizeof(bias);
-	RegSetValueEx(key, "bias",				NULL, REG_DWORD, (unsigned char *)&bias, size);
+	RegSetValueEx(key, L"bias",				NULL, REG_DWORD, (unsigned char *)&bias, size);
 	size = sizeof(show_name_tips);
-	RegSetValueEx(key, "show_name_tips",	NULL, REG_DWORD, (unsigned char *)&show_name_tips, size);
+	RegSetValueEx(key, L"show_name_tips",	NULL, REG_DWORD, (unsigned char *)&show_name_tips, size);
 	size = sizeof(rollover_box);
-	RegSetValueEx(key, "show_rollover_box",	NULL, REG_DWORD, (unsigned char *)&rollover_box, size);
+	RegSetValueEx(key, L"show_rollover_box",	NULL, REG_DWORD, (unsigned char *)&rollover_box, size);
 	size = sizeof(show_info_tips);
-	RegSetValueEx(key, "show_info_tips",	NULL, REG_DWORD, (unsigned char *)&show_info_tips, size);
+	RegSetValueEx(key, L"show_info_tips",	NULL, REG_DWORD, (unsigned char *)&show_info_tips, size);
 	size = sizeof(nametip_delay);
-	RegSetValueEx(key, "nametip_delay",		NULL, REG_DWORD, (unsigned char *)&nametip_delay, size);
+	RegSetValueEx(key, L"nametip_delay",		NULL, REG_DWORD, (unsigned char *)&nametip_delay, size);
 	size = sizeof(infotip_flags);
-	RegSetValueEx(key, "infotip_flags",		NULL, REG_DWORD, (unsigned char *)&infotip_flags, size);
+	RegSetValueEx(key, L"infotip_flags",		NULL, REG_DWORD, (unsigned char *)&infotip_flags, size);
 	size = sizeof(infotip_delay);
-	RegSetValueEx(key, "infotip_delay",		NULL, REG_DWORD, (unsigned char *)&infotip_delay, size);
+	RegSetValueEx(key, L"infotip_delay",		NULL, REG_DWORD, (unsigned char *)&infotip_delay, size);
 	size = sizeof(rect.left);
-	RegSetValueEx(key, "window_rect.left",	NULL, REG_DWORD, (unsigned char *)&rect.left, size);
+	RegSetValueEx(key, L"window_rect.left",	NULL, REG_DWORD, (unsigned char *)&rect.left, size);
 	size = sizeof(rect.top);
-	RegSetValueEx(key, "window_rect.top",	NULL, REG_DWORD, (unsigned char *)&rect.top, size);
+	RegSetValueEx(key, L"window_rect.top",	NULL, REG_DWORD, (unsigned char *)&rect.top, size);
 	size = sizeof(rect.right);
-	RegSetValueEx(key, "window_rect.right",	NULL, REG_DWORD, (unsigned char *)&rect.right, size);
+	RegSetValueEx(key, L"window_rect.right",	NULL, REG_DWORD, (unsigned char *)&rect.right, size);
 	size = sizeof(rect.bottom);
-	RegSetValueEx(key, "window_rect.bottom",NULL, REG_DWORD, (unsigned char *)&rect.bottom, size);
+	RegSetValueEx(key, L"window_rect.bottom",NULL, REG_DWORD, (unsigned char *)&rect.bottom, size);
 	size = sizeof(showcmd);
-	RegSetValueEx(key, "window_showcmd",	NULL, REG_DWORD, (unsigned char *)&showcmd, size);
+	RegSetValueEx(key, L"window_showcmd",	NULL, REG_DWORD, (unsigned char *)&showcmd, size);
 	size = sizeof(lang);
-	RegSetValueEx(key, "lang",				NULL, REG_SZ, (unsigned char *)&lang, 3);
+	RegSetValueExA(key, "lang",				NULL, REG_SZ, (unsigned char *)&lang, 3);
 	RegCloseKey(key);
 }

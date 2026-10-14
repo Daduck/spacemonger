@@ -4,51 +4,10 @@
 
 namespace PathUtil {
 
-std::wstring AnsiToWide(const std::string& str) {
-	if (str.empty()) return L"";
-	int size_needed = MultiByteToWideChar(CP_ACP, 0, str.c_str(), (int)str.size(), NULL, 0);
-	std::wstring wstrTo(size_needed, 0);
-	MultiByteToWideChar(CP_ACP, 0, str.c_str(), (int)str.size(), &wstrTo[0], size_needed);
-	return wstrTo;
-}
-
-std::string WideToAnsi(const std::wstring& wstr) {
-	if (wstr.empty()) return "";
-	int size_needed = WideCharToMultiByte(CP_ACP, 0, wstr.c_str(), (int)wstr.size(), NULL, 0, NULL, NULL);
-	std::string strTo(size_needed, 0);
-	WideCharToMultiByte(CP_ACP, 0, wstr.c_str(), (int)wstr.size(), &strTo[0], size_needed, NULL, NULL);
-	return strTo;
-}
-
-std::string NormalizeSeparators(const std::string& path) {
-	std::string normalized = path;
-	std::replace(normalized.begin(), normalized.end(), '/', '\\');
-	return normalized;
-}
-
 std::wstring NormalizeSeparators(const std::wstring& path) {
 	std::wstring normalized = path;
 	std::replace(normalized.begin(), normalized.end(), L'/', L'\\');
 	return normalized;
-}
-
-std::string Join(const std::string& base, const std::string& extra) {
-	if (base.empty()) return NormalizeSeparators(extra);
-	if (extra.empty()) return NormalizeSeparators(base);
-
-	std::string normalizedBase = NormalizeSeparators(base);
-	std::string normalizedExtra = NormalizeSeparators(extra);
-
-	bool baseHasTrailing = (!normalizedBase.empty() && normalizedBase.back() == '\\');
-	bool extraHasLeading = (!normalizedExtra.empty() && normalizedExtra.front() == '\\');
-
-	if (baseHasTrailing && extraHasLeading) {
-		return normalizedBase + normalizedExtra.substr(1);
-	} else if (!baseHasTrailing && !extraHasLeading) {
-		return normalizedBase + "\\" + normalizedExtra;
-	} else {
-		return normalizedBase + normalizedExtra;
-	}
 }
 
 std::wstring Join(const std::wstring& base, const std::wstring& extra) {
@@ -68,15 +27,6 @@ std::wstring Join(const std::wstring& base, const std::wstring& extra) {
 	} else {
 		return normalizedBase + normalizedExtra;
 	}
-}
-
-std::string EnsureTrailingBackslash(const std::string& path) {
-	if (path.empty()) return "\\";
-	std::string normalized = NormalizeSeparators(path);
-	if (normalized.back() != '\\') {
-		normalized += '\\';
-	}
-	return normalized;
 }
 
 std::wstring EnsureTrailingBackslash(const std::wstring& path) {
@@ -101,10 +51,6 @@ std::wstring GetAbsolutePath(const std::wstring& path) {
 
 	result.resize(written);
 	return result;
-}
-
-std::wstring GetAbsolutePath(const std::string& path) {
-	return GetAbsolutePath(AnsiToWide(path));
 }
 
 std::wstring PrepareLongPath(const std::wstring& path) {
@@ -136,10 +82,6 @@ std::wstring PrepareLongPath(const std::wstring& path) {
 	return absolute;
 }
 
-std::wstring PrepareLongPath(const std::string& path) {
-	return PrepareLongPath(AnsiToWide(path));
-}
-
 std::wstring RemoveLongPathPrefix(const std::wstring& path) {
 	if (path.rfind(L"\\\\?\\UNC\\", 0) == 0) {
 		return L"\\\\" + path.substr(8);
@@ -163,8 +105,8 @@ std::wstring::size_type AppendComponent(std::wstring& path, const wchar_t *compo
 	return originalLength;
 }
 
-std::wstring BuildWidePath(const char *root, const std::wstring& relativePath, const wchar_t *leafName) {
-	std::wstring path = AnsiToWide(root == NULL ? "" : root);
+std::wstring BuildWidePath(const wchar_t *root, const std::wstring& relativePath, const wchar_t *leafName) {
+	std::wstring path = root == NULL ? L"" : root;
 	std::wstring relative = NormalizeSeparators(relativePath);
 
 	path = NormalizeSeparators(path);

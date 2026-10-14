@@ -120,7 +120,7 @@ extern "C" {
 void WINAPI InitTipWnd(HINSTANCE inst);
 HWND WINAPI CreateTipWnd(HWND owner, const RECT *rect, BOOL showwnd);
 HWND WINAPI CreateTipWndEz(HWND owner, int x, int y,
-	const char *text, HICON icon, BOOL showwnd);
+	const wchar_t *text, HICON icon, BOOL showwnd);
 
 #ifdef __cplusplus
 };
@@ -141,7 +141,7 @@ public:
 	CTipWnd();
 	virtual ~CTipWnd();
 	virtual BOOL Create(CWnd *owner, const RECT &rect, BOOL showwnd = 0);
-	virtual BOOL CreateEz(CWnd *owner, int x, int y, const CString &text = "",
+	virtual BOOL CreateEz(CWnd *owner, int x, int y, const CString &text = L"",
 		HICON icon = NULL, BOOL showwnd = 0);
 	void MoveWindow(CWnd *owner, int x, int y);
 	void PushOnScreen(void);

@@ -103,11 +103,9 @@ static int logical_size_is_preserved_for_details()
 
 static int concurrent_allocated_size_lookup()
 {
-	char temp[MAX_PATH], file[MAX_PATH];
-	CHECK(GetTempPathA(MAX_PATH, temp) != 0);
-	CHECK(GetTempFileNameA(temp, "SMD", 0, file) != 0);
-	wchar_t wideFile[MAX_PATH];
-	CHECK(MultiByteToWideChar(CP_ACP, 0, file, -1, wideFile, MAX_PATH) != 0);
+	wchar_t temp[MAX_PATH], file[MAX_PATH];
+	CHECK(GetTempPathW(MAX_PATH, temp) != 0);
+	CHECK(GetTempFileNameW(temp, L"SMD", 0, file) != 0);
 	std::atomic<int> ready{0}, failures{0};
 	std::atomic<bool> start{false};
 	std::vector<std::thread> workers;
@@ -116,20 +114,18 @@ static int concurrent_allocated_size_lookup()
 			++ready;
 			while (!start.load()) std::this_thread::yield();
 			// The flag forces lookup; the real empty file has zero allocated bytes.
-			WIN32_FIND_DATAA data{};
 			WIN32_FIND_DATAW wideData{};
-			data.dwFileAttributes = wideData.dwFileAttributes = FILE_ATTRIBUTE_SPARSE_FILE;
+			wideData.dwFileAttributes = FILE_ATTRIBUTE_SPARSE_FILE;
 			for (int j = 0; j < 100; ++j) {
-				SM_FILE_SIZE_INFO a{}, w{};
-				if (!SM_LoadFileSizeInfo(file, &data, &a) || !a.has_allocated_size || a.allocated_size != 0) ++failures;
-				if (!SM_LoadFileSizeInfoW(wideFile, &wideData, &w) || !w.has_allocated_size || w.allocated_size != 0) ++failures;
+				SM_FILE_SIZE_INFO w{};
+				if (!SM_LoadFileSizeInfoW(file, &wideData, &w) || !w.has_allocated_size || w.allocated_size != 0) ++failures;
 			}
 		});
 	}
 	while (ready.load() != 16) std::this_thread::yield();
 	start.store(true);
 	for (auto& worker : workers) worker.join();
-	DeleteFileA(file);
+	DeleteFileW(file);
 	CHECK(failures.load() == 0);
 	return 1;
 }

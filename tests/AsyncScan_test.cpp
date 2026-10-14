@@ -130,6 +130,47 @@ static int test_async_scan_directory_tree()
 	return 1;
 }
 
+static int test_async_scan_preserves_unicode_names()
+{
+	std::wstring tempDir = CreateTempTestDirectory();
+	std::wstring scanRoot = tempDir + L"\\\u8A66\u9A13";
+	const std::wstring folderName = L"\u4F8B\u5916\u30D5\u30A9\u30EB\u30C0";
+	const std::wstring rootFileName = L"\u6587\u4EF6-\u03A9.txt";
+	const std::wstring nestedFileName = L"\u30C6\u30B9\u30C8-\u0416.bin";
+	CHECK(CreateDirectoryW(scanRoot.c_str(), nullptr));
+	std::wstring folderPath = scanRoot + L"\\" + folderName;
+	CHECK(CreateDirectoryW(folderPath.c_str(), nullptr));
+	CreateDummyFile(scanRoot + L"\\" + rootFileName, 20);
+	CreateDummyFile(folderPath + L"\\" + nestedFileName, 30);
+
+	AsyncScanEngine engine;
+	std::wstring preparedPath = PathUtil::EnsureTrailingBackslash(PathUtil::PrepareLongPath(scanRoot));
+	CHECK(engine.StartScan(preparedPath, 0, false, 2));
+	engine.WaitForCompletion();
+	ScanProgress progress = engine.GetProgress();
+	CHECK(progress.isComplete && progress.numFiles == 2 && progress.numFolders == 1);
+
+	CStringArena targetArena;
+	CFolder *root = engine.DetachResult(targetArena);
+	CHECK(root != nullptr);
+	bool foundRootFile = false;
+	bool foundFolder = false;
+	for (ui32 i = 0; i < root->cur; ++i) {
+		if (wcscmp(root->names[i], rootFileName.c_str()) == 0)
+			foundRootFile = true;
+		if (wcscmp(root->names[i], folderName.c_str()) == 0) {
+			foundFolder = true;
+			CFolder *folder = root->children[i];
+			CHECK(folder != nullptr && folder->cur == 1);
+			CHECK(wcscmp(folder->names[0], nestedFileName.c_str()) == 0);
+		}
+	}
+	delete root;
+	DeleteTestDirectory(tempDir);
+	CHECK(foundRootFile && foundFolder);
+	return 1;
+}
+
 static int test_async_scan_cancellation()
 {
 	std::wstring tempDir = CreateTempTestDirectory();
@@ -698,6 +739,7 @@ int main()
 	if (!test_depth_limit_reports_partial_scan()) return 1;
 	if (!test_access_denied_reports_scan_status()) return 1;
 	if (!test_async_scan_directory_tree()) return 1;
+	if (!test_async_scan_preserves_unicode_names()) return 1;
 	if (!test_async_scan_cancellation()) return 1;
 	if (!test_async_scan_rescan_after_cancel()) return 1;
 	if (!test_async_scan_repeated_shutdown_stress()) return 1;

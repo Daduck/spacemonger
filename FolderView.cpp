@@ -7,6 +7,7 @@
 #include "TipWnd.h"
 #include "PathUtil.h"
 #include "Lang.h"
+#include "UnicodeFontFallback.h"
 
 IMPLEMENT_DYNCREATE(CFolderView, CFreeView)
 
@@ -88,11 +89,14 @@ CFolderView::CFolderView()
 	zoomlevel = 0;
 	showfreespace = 1;
 	lastcur = NULL;
+	m_nameTipFontChoice = NULL;
 }
 
 CFolderView::~CFolderView()
 {
 	m_layoutNodes.clear();
+	for (size_t i = 0; i < m_unicodeFonts.size(); ++i)
+		if (m_unicodeFonts[i] != NULL) ::DeleteObject(m_unicodeFonts[i]);
 }
 
 BEGIN_MESSAGE_MAP(CFolderView, CFreeView)
@@ -133,17 +137,34 @@ static UINT GetWindowDpi(HWND hwnd)
 void CFolderView::RecreateFonts(void)
 {
 	if (minifont.m_hObject != NULL) minifont.DeleteObject();
+	for (size_t i = 0; i < m_unicodeFonts.size(); ++i)
+		if (m_unicodeFonts[i] != NULL) ::DeleteObject(m_unicodeFonts[i]);
+	m_unicodeFonts.clear();
 
 	minifont.CreateFont(-9, 0, 0, 0, FW_NORMAL, 0, 0, 0, ANSI_CHARSET,
 		OUT_RASTER_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
-		VARIABLE_PITCH|FF_SWISS, "Small Fonts");
+		VARIABLE_PITCH|FF_SWISS, L"Small Fonts");
+
+	// Keep the classic bitmap face as the first choice. Check Unicode-capable
+	// system families against each name before using them as a fallback.
+	m_unicodeFonts = SM_CreateUnicodeFallbackFonts(-9);
 
 	if (::IsWindow(m_nametipwnd.m_hWnd)) {
-		HFONT nametipfont = ::CreateFont(-9, 0, 0, 0, FW_NORMAL, 0, 0, 0, ANSI_CHARSET,
-			OUT_RASTER_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
-			VARIABLE_PITCH|FF_SWISS, "Small Fonts");
-		::SendMessage(m_nametipwnd.m_hWnd, WM_SETFONT, (WPARAM)nametipfont, TRUE);
+		m_nameTipFontChoice = NULL;
+		SetNameTipFont((HFONT)minifont.GetSafeHandle());
 	}
+}
+
+void CFolderView::SetNameTipFont(HFONT font)
+{
+	if (!::IsWindow(m_nametipwnd.m_hWnd) || font == NULL || font == m_nameTipFontChoice)
+		return;
+	LOGFONTW logfont;
+	if (::GetObjectW(font, sizeof(logfont), &logfont) != sizeof(logfont)) return;
+	HFONT ownedFont = ::CreateFontIndirectW(&logfont);
+	if (ownedFont == NULL) return;
+	::SendMessageW(m_nametipwnd.m_hWnd, WM_SETFONT, (WPARAM)ownedFont, TRUE);
+	m_nameTipFontChoice = font;
 }
 
 BOOL CFolderView::OnWndMsg(UINT message, WPARAM wParam, LPARAM lParam, LRESULT *pResult)
@@ -304,7 +325,7 @@ static void PrintFileSize(CString &string, ui64 size)
 {
 	CString sizestring;
 	ui32 displayfull, displayfractional;
-	const char *displaytype;
+	const wchar_t *displaytype;
 
 	if (size < (ui64)(1024)) {
 		displayfull = (ui32)size;
@@ -344,12 +365,12 @@ static void PrintDate(CString &string, ui64 time)
 	SYSTEMTIME st;
 	FileTimeToSystemTime(&lft, &st);
 
-	char date[64], timebuf[64];
-	GetDateFormatA(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, sizeof(date));
-	GetTimeFormatA(LOCALE_USER_DEFAULT, TIME_NOSECONDS, &st, NULL, timebuf, sizeof(timebuf));
+	wchar_t date[64], timebuf[64];
+	GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, _countof(date));
+	GetTimeFormatW(LOCALE_USER_DEFAULT, TIME_NOSECONDS, &st, NULL, timebuf, _countof(timebuf));
 
 	string += date;
-	string += " ";
+	string += L" ";
 	string += timebuf;
 }
 
@@ -361,7 +382,7 @@ void CFolderView::SetupInfoTip(const TreemapNode *cur)
 		return;
 
 	std::wstring widePath = BuildItemPathW(cur);
-	std::string path = PathUtil::WideToAnsi(BuildContainerPathW(cur));
+	std::wstring path = BuildContainerPathW(cur);
 	CString string;
 
 	WIN32_FILE_ATTRIBUTE_DATA info;
@@ -371,25 +392,25 @@ void CFolderView::SetupInfoTip(const TreemapNode *cur)
 	if (theApp.m_settings.infotip_flags & TIP_PATH)
 		string += path.c_str();
 	if (theApp.m_settings.infotip_flags & TIP_NAME)
-		string += PathUtil::WideToAnsi(cur->source->names[cur->index]).c_str();
+		string += cur->source->names[cur->index];
 	if (theApp.m_settings.infotip_flags & (TIP_NAME|TIP_PATH))
 		string += '\n';
 	if (theApp.m_settings.infotip_flags & TIP_SIZE)
 		PrintFileSize(string, cur->source->actualsizes[cur->index]);
 	if (theApp.m_settings.infotip_flags & TIP_ATTRIB) {
 		if ((theApp.m_settings.infotip_flags & TIP_SIZE)
-			&& info.dwFileAttributes != 0) string += "  /  ";
-		if (info.dwFileAttributes & FILE_ATTRIBUTE_ARCHIVE)			string += " ", string += CurLang->attribnames[0];
-		if (info.dwFileAttributes & FILE_ATTRIBUTE_COMPRESSED)		string += " ", string += CurLang->attribnames[1];
-		if (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)		string += " ", string += CurLang->attribnames[2];
-		if (info.dwFileAttributes & FILE_ATTRIBUTE_ENCRYPTED)		string += " ", string += CurLang->attribnames[3];
-		if (info.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN)			string += " ", string += CurLang->attribnames[4];
-		if (info.dwFileAttributes & FILE_ATTRIBUTE_OFFLINE)			string += " ", string += CurLang->attribnames[5];
-		if (info.dwFileAttributes & FILE_ATTRIBUTE_READONLY)		string += " ", string += CurLang->attribnames[6];
-		if (info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)	string += " ", string += CurLang->attribnames[7];
-		if (info.dwFileAttributes & FILE_ATTRIBUTE_SPARSE_FILE)		string += " ", string += CurLang->attribnames[8];
-		if (info.dwFileAttributes & FILE_ATTRIBUTE_SYSTEM)			string += " ", string += CurLang->attribnames[9];
-		if (info.dwFileAttributes & FILE_ATTRIBUTE_TEMPORARY)		string += " ", string += CurLang->attribnames[10];
+			&& info.dwFileAttributes != 0) string += L"  /  ";
+		if (info.dwFileAttributes & FILE_ATTRIBUTE_ARCHIVE)			string += L" ", string += CurLang->attribnames[0];
+		if (info.dwFileAttributes & FILE_ATTRIBUTE_COMPRESSED)		string += L" ", string += CurLang->attribnames[1];
+		if (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)		string += L" ", string += CurLang->attribnames[2];
+		if (info.dwFileAttributes & FILE_ATTRIBUTE_ENCRYPTED)		string += L" ", string += CurLang->attribnames[3];
+		if (info.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN)			string += L" ", string += CurLang->attribnames[4];
+		if (info.dwFileAttributes & FILE_ATTRIBUTE_OFFLINE)			string += L" ", string += CurLang->attribnames[5];
+		if (info.dwFileAttributes & FILE_ATTRIBUTE_READONLY)		string += L" ", string += CurLang->attribnames[6];
+		if (info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)	string += L" ", string += CurLang->attribnames[7];
+		if (info.dwFileAttributes & FILE_ATTRIBUTE_SPARSE_FILE)		string += L" ", string += CurLang->attribnames[8];
+		if (info.dwFileAttributes & FILE_ATTRIBUTE_SYSTEM)			string += L" ", string += CurLang->attribnames[9];
+		if (info.dwFileAttributes & FILE_ATTRIBUTE_TEMPORARY)		string += L" ", string += CurLang->attribnames[10];
 	}
 	if (theApp.m_settings.infotip_flags & (TIP_ATTRIB|TIP_SIZE))
 		string += '\n';
@@ -419,13 +440,16 @@ void CFolderView::SetupNameTip(const TreemapNode *cur)
 	if (cur == NULL || cur->name == NULL || cur->IsSpecial()) return;
 
 	CDC *pDC = GetDC();
-	pDC->SelectObject(&minifont);
+	int len = (int)wcslen(cur->name);
+	HFONT nameFont = SM_SelectFontForText(pDC->GetSafeHdc(),
+		(HFONT)minifont.GetSafeHandle(), m_unicodeFonts, cur->name, len);
+	pDC->SelectObject(nameFont);
+	SetNameTipFont(nameFont);
 	pDC->SetBkMode(TRANSPARENT);
 	pDC->SetTextAlign(TA_LEFT | TA_TOP | TA_NOUPDATECP);
 	pDC->SelectPalette(&m_palette, 0);
 
 	int tx, ty, failed = 0;
-	int len = (int)wcslen(cur->name);
 	CSize size;
 	::GetTextExtentPoint32W(pDC->GetSafeHdc(), cur->name, len, &size);
 	int x = cur->x, y = cur->y, w = cur->w + 1, h = cur->h + 1;
@@ -435,7 +459,10 @@ void CFolderView::SetupNameTip(const TreemapNode *cur)
 	if (size.cy > h - 2) ty = y + 1;
 	else if (cur->flags & 1) ty = y + 1, failed++;
 	else ty = y + (h - size.cy) / 2, failed++;
-	if (failed == 2) return;
+	if (failed == 2) {
+		ReleaseDC(pDC);
+		return;
+	}
 
 	if (!(cur->flags & 1) && h >= 36 && w >= 48)
 		ty -= 12;
@@ -462,7 +489,7 @@ void CFolderView::SetupNameTip(const TreemapNode *cur)
 	m_nametipwnd.RedrawWindow();
 }
 
-static void AddMenuEntry(HMENU menu, UINT cmd = 0, const char *string = NULL,
+static void AddMenuEntry(HMENU menu, UINT cmd = 0, const wchar_t *string = NULL,
 	BOOL checked = 0, BOOL disabled = 0, BOOL bold = 0)
 {
 	MENUITEMINFO mii;
@@ -477,8 +504,8 @@ static void AddMenuEntry(HMENU menu, UINT cmd = 0, const char *string = NULL,
 	mii.hSubMenu = NULL;
 	mii.hbmpChecked = NULL;
 	mii.hbmpUnchecked = NULL;
-	mii.dwTypeData = (char *)string;
-	if (string != NULL) mii.cch = (UINT)strlen(string);
+	mii.dwTypeData = (wchar_t *)string;
+	if (string != NULL) mii.cch = (UINT)wcslen(string);
 	else mii.cch = 0;
 
 	::InsertMenuItem(menu, GetMenuItemCount(menu), TRUE, &mii);
@@ -542,7 +569,7 @@ static CString GetSizeString(ui64 size, ui64 totalspace, BOOL percent)
 	}
 	else {
 		ui32 displayfull, displayfractional;
-		const char *displaytype;
+		const wchar_t *displaytype;
 
 		if (size < (ui64)(1024)) {
 			displayfull = (ui32)size;
@@ -579,32 +606,32 @@ void CFolderView::UpdateTitleBar(void)
 
 	CFolderTree *ft = (CFolderTree *)GetDocument();
 	if (ft == NULL || rootfolder == NULL) {
-		mainfrm->SetWindowText("SpaceMonger");
+		mainfrm->SetWindowText(L"SpaceMonger");
 		return;
 	}
 
-	CString title = "";
+	CString title = L"";
 	ui64 size;
 
 	if (selected != NULL && selected->name != NULL) {
 		title += ft->m_path;
 		BuildTitleReverse(selected->source, title);
-		title += PathUtil::WideToAnsi(selected->source->names[selected->index]).c_str();
+		title += selected->source->names[selected->index];
 		size = selected->source->sizes[selected->index];
-		title += "  -  " + GetSizeString(size, ft->totalspace, 1)
-			+ "  -  " + GetSizeString(size, ft->totalspace, 0) + "  -  ";
+		title += L"  -  " + GetSizeString(size, ft->totalspace, 1)
+			+ L"  -  " + GetSizeString(size, ft->totalspace, 0) + L"  -  ";
 	}
 	else if (rootfolder != NULL) {
 		title += ft->m_path;
 		BuildTitleReverse(rootfolder, title);
 		if (rootfolder->parent == NULL) size = ft->totalspace; // Kludge
 		else size = rootfolder->SizeTotal();
-		title += "  -  " + GetSizeString(size, ft->totalspace, 0)
-			+ " " + CurLang->total + "  -  " + GetSizeString(ft->freespace, ft->freespace, 0)
-			+ " " + CurLang->free + "  -  ";
+		title += L"  -  " + GetSizeString(size, ft->totalspace, 0)
+			+ L" " + CurLang->total + L"  -  " + GetSizeString(ft->freespace, ft->freespace, 0)
+			+ L" " + CurLang->free + L"  -  ";
 	}
 
-	title += "SpaceMonger";
+	title += L"SpaceMonger";
 
 	mainfrm->SetWindowText(title);
 }	
@@ -615,8 +642,8 @@ void CFolderView::BuildTitleReverse(CFolder *folder, CString &string)
 		BuildTitleReverse(folder->parent, string);
 	if (folder->parent == NULL) return;
 
-	string += PathUtil::WideToAnsi(folder->parent->names[folder->parentindex]).c_str();
-	string += "\\";
+	string += folder->parent->names[folder->parentindex];
+	string += L"\\";
 }
 
 void CFolderView::BuildTitleReverseW(CFolder *folder, std::wstring& string)
@@ -638,7 +665,7 @@ std::wstring CFolderView::BuildContainerPathW(const TreemapNode *folder)
 	if (folder != NULL)
 		BuildTitleReverseW(folder->source, relativePath);
 
-	return PathUtil::BuildWidePath(tree == NULL ? "" : tree->m_path, relativePath, NULL);
+	return PathUtil::BuildWidePath(tree == NULL ? L"" : tree->m_path, relativePath, NULL);
 }
 
 std::wstring CFolderView::BuildItemPathW(const TreemapNode *folder)
@@ -653,7 +680,7 @@ std::wstring CFolderView::BuildItemPathW(const TreemapNode *folder)
 			leafName = folder->source->names[folder->index];
 	}
 
-	return PathUtil::BuildWidePath(tree == NULL ? "" : tree->m_path, relativePath, leafName);
+	return PathUtil::BuildWidePath(tree == NULL ? L"" : tree->m_path, relativePath, leafName);
 }
 
 void CFolderView::OnDraw(CDC *pDC)
@@ -736,7 +763,11 @@ void CFolderView::MinimalDrawDisplayFolder(CDC *pDC, const TreemapNode *cur, BOO
 		CSize size;
 		int tx, ty;
 
+		HFONT nameFont = SM_SelectFontForText(pDC->GetSafeHdc(),
+			(HFONT)minifont.GetSafeHandle(), m_unicodeFonts, cur->name, len);
+		HGDIOBJ oldNameFont = ::SelectObject(pDC->GetSafeHdc(), nameFont);
 		::GetTextExtentPoint32W(pDC->GetSafeHdc(), cur->name, len, &size);
+		::SelectObject(pDC->GetSafeHdc(), oldNameFont);
 		if (size.cx > w - 2 || (cur->flags & 1)) tx = x + 2;
 		else tx = x + (w - size.cx) / 2;
 		if (size.cy > h - 2 || (cur->flags & 1)) ty = y + 1;
@@ -757,13 +788,13 @@ void CFolderView::MinimalDrawDisplayFolder(CDC *pDC, const TreemapNode *cur, BOO
 				else tx = x + (w - size.cx) / 2;
 				pDC->TextOut(tx, ty-18, string);
 
-				string = GetSizeString(ft->freespace, ft->totalspace, 0) + " " + CurLang->free;
+				string = GetSizeString(ft->freespace, ft->totalspace, 0) + L" " + CurLang->free;
 				pDC->TextOut(tx, ty-6, string);
 				
-				string.Format("%s  %u", (const char*)CString(CurLang->files_total), ft->numfiles);
+				string.Format(L"%s  %u", CurLang->files_total, ft->numfiles);
 				pDC->TextOut(tx, ty+6, string);
 				
-				string.Format("%s  %u", (const char*)CString(CurLang->folders_total), ft->numfolders);
+				string.Format(L"%s  %u", CurLang->folders_total, ft->numfolders);
 				pDC->TextOut(tx, ty+15, string);
 			}
 		}
@@ -775,9 +806,13 @@ void CFolderView::MinimalDrawDisplayFolder(CDC *pDC, const TreemapNode *cur, BOO
 				const wchar_t *label = cur->name + 1;
 				int labelLen = (int)wcslen(label);
 				CSize labelSize;
+				HFONT labelFont = SM_SelectFontForText(pDC->GetSafeHdc(),
+					(HFONT)minifont.GetSafeHandle(), m_unicodeFonts, label, labelLen);
+				HGDIOBJ oldLabelFont = ::SelectObject(pDC->GetSafeHdc(), labelFont);
 				::GetTextExtentPoint32W(pDC->GetSafeHdc(), label, labelLen, &labelSize);
 				int labelX = labelSize.cx > w - 2 ? x + 2 : x + (w - labelSize.cx) / 2;
 				::TextOutW(pDC->GetSafeHdc(), labelX, ty - 6, label, labelLen);
+				::SelectObject(pDC->GetSafeHdc(), oldLabelFont);
 
 				CFolderTree *ft = (CFolderTree *)GetDocument();
 				if (ft != NULL && cur->source != NULL && cur->index != (ui32)-1) {
@@ -807,7 +842,9 @@ void CFolderView::MinimalDrawDisplayFolder(CDC *pDC, const TreemapNode *cur, BOO
 				else pDC->TextOut(x+(w-size.cx)/2, ty+11, string);
 				ty -= 12;
 			}
+			oldNameFont = ::SelectObject(pDC->GetSafeHdc(), nameFont);
 			::TextOutW(pDC->GetSafeHdc(), tx, ty, cur->name, len);
+			::SelectObject(pDC->GetSafeHdc(), oldNameFont);
 			if (sel) pDC->SetTextColor(RGB(0,0,0));
 		}
 		pDC->SelectClipRgn(NULL);

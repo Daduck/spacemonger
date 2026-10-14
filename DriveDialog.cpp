@@ -56,7 +56,7 @@ BOOL CDriveDialog::OnInitDialog()
 	CDriveInfo driveinfo[26];
 	HIMAGELIST imagelist;
 	int i, index;
-	LV_ITEM item;
+	LVITEMW item = {};
 
 	imagelist = ImageList_Create(32, 32, TRUE, 0, 26);
 
@@ -67,7 +67,7 @@ BOOL CDriveDialog::OnInitDialog()
 	SetDlgItemText(IDOK, CurLang->ok);
 	SetDlgItemText(IDCANCEL, CurLang->cancel);
 
-	lc->InsertColumn(0, "Name");
+	lc->InsertColumn(0, L"Name");
 	if (lc != NULL) {
 		lc->SetItemCount(26);
 		index = 0;
@@ -81,10 +81,10 @@ BOOL CDriveDialog::OnInitDialog()
 				item.state = 0;
 				item.stateMask = LVIS_SELECTED;
 				item.pszText = driveinfo[i-'A'].longname;
-				item.cchTextMax = strlen(driveinfo[i-'A'].longname);
+				item.cchTextMax = (int)wcslen(driveinfo[i-'A'].longname);
 				item.iImage = index;
 				item.lParam = i - 'A';
-				::SendMessage(lc->m_hWnd, LVM_INSERTITEM, (WPARAM)0, (LPARAM)(&item));
+				::SendMessageW(lc->m_hWnd, LVM_INSERTITEMW, (WPARAM)0, (LPARAM)(&item));
 				index++;
 			}
 			driveinfo[i-'A'].Free();
@@ -122,29 +122,29 @@ void CDriveInfo::LoadDriveInfo(char let)
 {
 	Free();
 
-	char name[8];
+	wchar_t name[8];
 	UINT type;
 
 	if (let >= 'a' && let <= 'z') let -= 32;
-	name[0] = let;
-	name[1] = ':';
-	name[2] = '\\';
-	name[3] = '\0';
+	name[0] = (wchar_t)let;
+	name[1] = L':';
+	name[2] = L'\\';
+	name[3] = L'\0';
 
-	type = GetDriveType(name);
+	type = GetDriveTypeW(name);
 
 	if (type != 0 && type != 1) {
-		SHFILEINFO fileinfo;
+		SHFILEINFOW fileinfo;
 		memset(&fileinfo, 0, sizeof(SHFILEINFO));
 
-		SHGetFileInfo(name, 0, &fileinfo, sizeof(SHFILEINFO),
+		SHGetFileInfoW(name, 0, &fileinfo, sizeof(SHFILEINFOW),
 			SHGFI_DISPLAYNAME|SHGFI_ICON);
 
 		avail = 1;
 		letter = let;
 		icon = fileinfo.hIcon;
-		longname = new char[strlen(fileinfo.szDisplayName)+1];
-		strcpy_s(longname, strlen(fileinfo.szDisplayName)+1, fileinfo.szDisplayName);
+		longname = new wchar_t[wcslen(fileinfo.szDisplayName)+1];
+		wcscpy_s(longname, wcslen(fileinfo.szDisplayName)+1, fileinfo.szDisplayName);
 	}
 	else {
 		avail = 0;

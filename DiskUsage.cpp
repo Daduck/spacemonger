@@ -11,8 +11,6 @@
 #define FILE_ATTRIBUTE_UNPINNED 0x00100000
 #endif
 
-typedef DWORD (WINAPI *SM_GetCompressedFileSizeFunc)(LPCSTR filename, LPDWORD high_size);
-
 SM_UINT64 SM_MakeFileSize(DWORD low, DWORD high)
 {
 	return (SM_UINT64)low + ((SM_UINT64)high << 32);
@@ -70,65 +68,17 @@ SM_UINT64 SM_ChooseDisplayedFileSize(const SM_FILE_SIZE_INFO *info, SM_UINT64 cl
 	return SM_LegacyClusterSize(info->logical_size, cluster_mask, aligned);
 }
 
-static SM_GetCompressedFileSizeFunc SM_GetCompressedFileSizeProc(void)
-{
-	static const SM_GetCompressedFileSizeFunc get_compressed_size = []() {
-		HMODULE kernel = GetModuleHandle("KERNEL32.DLL");
-		return kernel == NULL ? nullptr
-			: reinterpret_cast<SM_GetCompressedFileSizeFunc>(GetProcAddress(kernel, "GetCompressedFileSizeA"));
-	}();
-
-	return get_compressed_size;
-}
-
 typedef DWORD (WINAPI *SM_GetCompressedFileSizeWFunc)(LPCWSTR filename, LPDWORD high_size);
 
 static SM_GetCompressedFileSizeWFunc SM_GetCompressedFileSizeWProc(void)
 {
 	static const SM_GetCompressedFileSizeWFunc get_compressed_size = []() {
-		HMODULE kernel = GetModuleHandle("KERNEL32.DLL");
+		HMODULE kernel = GetModuleHandleW(L"KERNEL32.DLL");
 		return kernel == NULL ? nullptr
 			: reinterpret_cast<SM_GetCompressedFileSizeWFunc>(GetProcAddress(kernel, "GetCompressedFileSizeW"));
 	}();
 
 	return get_compressed_size;
-}
-
-int SM_LoadFileSizeInfo(const char *path, const WIN32_FIND_DATA *finddata, SM_FILE_SIZE_INFO *info)
-{
-	DWORD high_size = 0;
-	DWORD low_size;
-	SM_GetCompressedFileSizeFunc get_compressed_size;
-
-	if (path == NULL || finddata == NULL || info == NULL)
-		return 0;
-
-	info->logical_size = SM_MakeFileSize(finddata->nFileSizeLow, finddata->nFileSizeHigh);
-	info->allocated_size = 0;
-	info->attributes = finddata->dwFileAttributes;
-	info->has_allocated_size = 0;
-
-	if (SM_IsCloudPlaceholder(info->attributes)) {
-		info->allocated_size = 0;
-		info->has_allocated_size = 1;
-		return 1;
-	}
-
-	if (!SM_ShouldLoadAllocatedSize(info->attributes))
-		return 1;
-
-	get_compressed_size = SM_GetCompressedFileSizeProc();
-	if (get_compressed_size == NULL)
-		return 1;
-
-	SetLastError(ERROR_SUCCESS);
-	low_size = get_compressed_size(path, &high_size);
-	if (low_size != 0xFFFFFFFFUL || GetLastError() == ERROR_SUCCESS) {
-		info->allocated_size = SM_MakeFileSize(low_size, high_size);
-		info->has_allocated_size = 1;
-	}
-
-	return 1;
 }
 
 int SM_LoadFileSizeInfoW(const wchar_t *path, const WIN32_FIND_DATAW *finddata, SM_FILE_SIZE_INFO *info)

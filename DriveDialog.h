@@ -11,7 +11,7 @@ struct CDriveInfo {
 	char letter;
 	BOOL avail;
 	HICON icon;
-	char *longname;
+	wchar_t *longname;
 };
 
 class CDriveDialog : public CDialog {

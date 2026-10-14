@@ -40,7 +40,7 @@ BOOL CFolderTree::LoadTree(const CString &path, BOOL includespace, CWnd *modalwi
 	cur = NULL;
 	filespace = 0;
 
-	std::wstring widePath = PathUtil::AnsiToWide((LPCTSTR)path);
+	std::wstring widePath(path.GetString());
 	std::wstring absPath = PathUtil::GetAbsolutePath(widePath);
 	absPath = PathUtil::EnsureTrailingBackslash(absPath);
 	wchar_t volumePath[MAX_PATH] = { 0 };
@@ -175,7 +175,7 @@ BOOL CFolderTree::LoadTree(const CString &path, BOOL includespace, CWnd *modalwi
 	ui64 unaccountedSpace = ComputeUnaccountedSpace(usedspace, filespace);
 	if (resultProgress.isPartial && isVolumeRoot && unaccountedSpace > 0) {
 		std::wstring unavailableName = L"|";
-		unavailableName += PathUtil::AnsiToWide(CurLang->scan_unavailable);
+		unavailableName += CurLang->scan_unavailable;
 		if (!root->AddFileWithArena(nameArena, unavailableName.c_str(),
 			(ui32)unavailableName.size(), unaccountedSpace, unaccountedSpace, 0)) {
 			delete root;
@@ -220,9 +220,9 @@ void CFolderTree::GetSpace(const CString &path)
 	// Next, load in Kernel32 and use GetDiskFreeSpaceEx to find out
 	// the size of the disk. If GetDiskFreeSpaceEx doesn't exist, then
 	// fall back on the values from GetDiskFreeSpace.
-	HINSTANCE hLibrary = LoadLibrary("KERNEL32.DLL");
+	HINSTANCE hLibrary = LoadLibraryW(L"KERNEL32.DLL");
 	GetFreeDiskSpaceExFunc getfreediskspaceex =
-		hLibrary == NULL ? NULL : (GetFreeDiskSpaceExFunc)GetProcAddress(hLibrary, "GetDiskFreeSpaceExA");
+		hLibrary == NULL ? NULL : (GetFreeDiskSpaceExFunc)GetProcAddress(hLibrary, "GetDiskFreeSpaceExW");
 	if (getfreediskspaceex != NULL && getfreediskspaceex(path, &oddfree, &total, &totalfree)) {
 		freespace = totalfree;
 		totalspace = total;
@@ -311,7 +311,7 @@ void CFolderDialog::Reset(void)
 	SetDlgItemText(IDC_STATIC_FILESFOUND, CurLang->files_found);
 	SetDlgItemText(IDC_STATIC_FOLDERSFOUND, CurLang->folders_found);
 	SetDlgItemText(IDCANCEL, CurLang->cancel);
-	SetDlgItemText(IDC_PATH, "");
+	SetDlgItemText(IDC_PATH, L"");
 	SetDlgItemInt(IDC_FILES, 0);
 	SetDlgItemInt(IDC_FOLDERS, 0);
 	CProgressCtrl *progress = (CProgressCtrl *)GetDlgItem(IDC_LOAD_PROGRESS);
@@ -338,9 +338,8 @@ void CFolderDialog::UpdateFromProgress(const ScanProgress& progress, ui64 usedsp
 {
 	if (!IsWindow(m_hWnd)) return;
 
-	std::string ansiPath = PathUtil::WideToAnsi(PathUtil::RemoveLongPathPrefix(progress.currentPath));
-
-	SetDlgItemText(IDC_PATH, ansiPath.c_str());
+	std::wstring displayPath = PathUtil::RemoveLongPathPrefix(progress.currentPath);
+	SetDlgItemText(IDC_PATH, displayPath.c_str());
 	SetDlgItemInt(IDC_FILES, (UINT)progress.numFiles);
 	SetDlgItemInt(IDC_FOLDERS, (UINT)progress.numFolders);
 

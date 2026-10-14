@@ -71,7 +71,7 @@ int CMainFrame::OnCreate(LPCREATESTRUCT lpCreateStruct)
 {
 	if (CFrameWnd::OnCreate(lpCreateStruct) == -1) return(-1);
 
-	SetWindowText("SpaceMonger");
+	SetWindowText(L"SpaceMonger");
 
 	HINSTANCE hinst = AfxFindResourceHandle(MAKEINTRESOURCE(ID_SPACEMONGER), RT_ICON);
 	HICON hicon = ::LoadIcon(hinst, MAKEINTRESOURCE(ID_SPACEMONGER));
@@ -79,14 +79,14 @@ int CMainFrame::OnCreate(LPCREATESTRUCT lpCreateStruct)
 	//SetIcon(hicon, 0);
 
 	if (!m_toolbar.Create(this)) return(-1);
-	if (!m_scanNoticeButton.Create("", WS_CHILD | BS_PUSHBUTTON | WS_TABSTOP,
+	if (!m_scanNoticeButton.Create(L"", WS_CHILD | BS_PUSHBUTTON | WS_TABSTOP,
 		CRect(0, 0, 1, 1), this, IDC_SCAN_NOTICE)) return(-1);
 	m_scanNoticeButton.ShowWindow(SW_HIDE);
 
 	CMenu *menu = GetSystemMenu(FALSE);
 	menu->AppendMenu(MF_SEPARATOR);
-	menu->AppendMenu(MF_STRING, ID_APP_ABOUT, CString("&")
-		+ CurLang->about_spacemonger + "...");
+	menu->AppendMenu(MF_STRING, ID_APP_ABOUT, CString(L"&")
+		+ CurLang->about_spacemonger + L"...");
 
 	WINDOWPLACEMENT w;
 	w.length = sizeof(WINDOWPLACEMENT);
