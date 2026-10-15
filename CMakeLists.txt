@@ -212,6 +212,29 @@ set_target_properties(AsyncScan_test PROPERTIES
 )
 add_test(NAME AsyncScan_test COMMAND AsyncScan_test)
 
+# Opt-in benchmark: built explicitly and never registered with CTest or the app.
+add_executable(AsyncScan_benchmark EXCLUDE_FROM_ALL
+  tests/AsyncScan_benchmark.cpp
+  AsyncScanEngine.cpp
+  AsyncScanEngine.h
+  TreemapLayout.cpp
+  TreemapLayout.h
+  DiskUsage.cpp
+  DiskUsage.h
+  PathUtil.cpp
+  PathUtil.h
+  FolderEntryArrays.cpp
+  FolderEntryArrays.h
+  Folder.cpp
+  Folder.h
+)
+target_include_directories(AsyncScan_benchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(AsyncScan_benchmark PRIVATE WIN32 _WINDOWS UNICODE _UNICODE ASYNC_SCAN_BENCHMARK)
+target_compile_options(AsyncScan_benchmark PRIVATE /W3 /EHsc)
+set_target_properties(AsyncScan_benchmark PROPERTIES
+  MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+)
+
 add_executable(Treemap_test
   tests/Treemap_test.cpp
   TreemapLayout.cpp

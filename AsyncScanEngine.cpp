@@ -5,6 +5,119 @@
 
 #include <windows.h>
 #include <algorithm>
+#ifdef ASYNC_SCAN_BENCHMARK
+#include <chrono>
+#endif
+
+#ifdef ASYNC_SCAN_BENCHMARK
+namespace {
+static ui64 BenchmarkNowNanoseconds()
+{
+	return (ui64)std::chrono::duration_cast<std::chrono::nanoseconds>(
+		std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+static size_t HistogramBucket(ui64 nanoseconds)
+{
+	size_t bucket = 0;
+	while (bucket < 63 && nanoseconds > ((ui64)1 << bucket)) ++bucket;
+	return bucket;
+}
+
+static void UpdateMaximum(ui64& target, ui64 value)
+{
+	if (target < value) target = value;
+}
+
+static ui64 HistogramPercentile(const std::array<ui64, 64>& histogram,
+	ui64 count, unsigned int percentile)
+{
+	if (count == 0) return 0;
+	ui64 wanted = (count * percentile + 99) / 100;
+	ui64 accumulated = 0;
+	for (size_t i = 0; i < histogram.size(); ++i) {
+		accumulated += histogram[i];
+		if (accumulated >= wanted) return (ui64)1 << i;
+	}
+	return (ui64)1 << 63;
+}
+
+}
+
+AsyncScanEngine::MeasuredTreeLock::MeasuredTreeLock(AsyncScanEngine& engine, LockMetricKind kind, size_t workerIndex)
+	: m_lock(engine.m_treeMutex, std::defer_lock),
+	  m_metrics(kind == LockMetricKind::WorkerMutation
+		? &engine.m_workerMutationMetrics[workerIndex] : &engine.m_layoutMetrics)
+{
+	m_measure = kind == LockMetricKind::Layout;
+	if (kind == LockMetricKind::WorkerMutation) {
+		// One deterministic sample per 256 mutations on each worker. Each worker
+		// owns its sequence and metric slot, so this adds no cross-worker traffic.
+		m_measure = (engine.m_workerMutationSequences[workerIndex]++ & 255) == 0;
+	}
+	if (!m_measure) {
+		m_lock.lock();
+		return;
+	}
+	ui64 before = BenchmarkNowNanoseconds();
+	m_lock.lock();
+	ui64 acquired = BenchmarkNowNanoseconds();
+	m_waitNanoseconds = acquired - before;
+	m_acquiredAt = acquired;
+}
+
+AsyncScanEngine::MeasuredTreeLock::~MeasuredTreeLock()
+{
+	if (!m_measure) {
+		m_lock.unlock();
+		return;
+	}
+	ui64 hold = BenchmarkNowNanoseconds() - m_acquiredAt;
+	m_lock.unlock();
+	++m_metrics->count;
+	m_metrics->waitNanoseconds += m_waitNanoseconds;
+	UpdateMaximum(m_metrics->maxWaitNanoseconds, m_waitNanoseconds);
+	++m_metrics->waitHistogram[HistogramBucket(m_waitNanoseconds)];
+	m_metrics->holdNanoseconds += hold;
+	UpdateMaximum(m_metrics->maxHoldNanoseconds, hold);
+	++m_metrics->holdHistogram[HistogramBucket(hold)];
+}
+
+TreeLockMetricSnapshot AsyncScanEngine::ReadMetrics(const BenchmarkLockMetrics& metrics)
+{
+	TreeLockMetricSnapshot result;
+	result.count = metrics.count;
+	result.waitNanoseconds = metrics.waitNanoseconds;
+	result.maxWaitNanoseconds = metrics.maxWaitNanoseconds;
+	result.holdNanoseconds = metrics.holdNanoseconds;
+	result.maxHoldNanoseconds = metrics.maxHoldNanoseconds;
+	result.p95WaitNanoseconds = HistogramPercentile(metrics.waitHistogram, result.count, 95);
+	result.p95HoldNanoseconds = HistogramPercentile(metrics.holdHistogram, result.count, 95);
+	return result;
+}
+
+TreeLockMetricSnapshot AsyncScanEngine::GetWorkerMutationLockMetrics() const
+{
+	BenchmarkLockMetrics aggregate;
+	for (const auto& worker : m_workerMutationMetrics) {
+		aggregate.count += worker.count;
+		aggregate.waitNanoseconds += worker.waitNanoseconds;
+		aggregate.maxWaitNanoseconds = (std::max)(aggregate.maxWaitNanoseconds, worker.maxWaitNanoseconds);
+		aggregate.holdNanoseconds += worker.holdNanoseconds;
+		aggregate.maxHoldNanoseconds = (std::max)(aggregate.maxHoldNanoseconds, worker.maxHoldNanoseconds);
+		for (size_t i = 0; i < aggregate.waitHistogram.size(); ++i) {
+			aggregate.waitHistogram[i] += worker.waitHistogram[i];
+			aggregate.holdHistogram[i] += worker.holdHistogram[i];
+		}
+	}
+	return ReadMetrics(aggregate);
+}
+
+TreeLockMetricSnapshot AsyncScanEngine::GetLayoutLockMetrics() const
+{
+	return ReadMetrics(m_layoutMetrics);
+}
+#endif
 
 AsyncScanEngine::AsyncScanEngine()
 	: m_clusterMask(0)
@@ -41,6 +154,11 @@ bool AsyncScanEngine::StartScan(const std::wstring& rootPath, ui64 clusterMask, 
 	m_numFiles.store(0);
 	m_numFolders.store(0);
 	m_bytesScanned.store(0);
+#ifdef ASYNC_SCAN_BENCHMARK
+	m_workerMutationMetrics.assign(m_numThreads, BenchmarkLockMetrics{});
+	m_workerMutationSequences.assign(m_numThreads, 0);
+	m_layoutMetrics = BenchmarkLockMetrics{};
+#endif
 	m_cancelled.store(false);
 	m_complete.store(false);
 	m_failed.store(false);
@@ -202,7 +320,11 @@ void AsyncScanEngine::ScanSubtree(size_t workerIndex, CFolder* folder, std::wstr
 
 			BOOL added;
 			{
+#ifdef ASYNC_SCAN_BENCHMARK
+				MeasuredTreeLock lock(*this, LockMetricKind::WorkerMutation, workerIndex);
+#else
 				std::lock_guard<std::mutex> lock(m_treeMutex);
+#endif
 				added = folder->AddFileWithArena(*m_workerArenas[workerIndex], finddata.cFileName,
 					(ui32)wcslen(finddata.cFileName), size, actualsize, *(ui64 *)&finddata.ftLastWriteTime);
 			}
@@ -245,7 +367,11 @@ void AsyncScanEngine::ScanSubtree(size_t workerIndex, CFolder* folder, std::wstr
 		CFolder *child = new CFolder;
 		BOOL added;
 		{
+#ifdef ASYNC_SCAN_BENCHMARK
+			MeasuredTreeLock lock(*this, LockMetricKind::WorkerMutation, workerIndex);
+#else
 			std::lock_guard<std::mutex> lock(m_treeMutex);
+#endif
 			added = folder->AddFolderWithArena(*m_workerArenas[workerIndex], dir.name.c_str(),
 				(ui32)dir.name.length(), child, dir.writeTime);
 		}
@@ -464,7 +590,11 @@ void AsyncScanEngine::GenerateLiveLayout(
 	outNameStorage.clear();
 	if (w <= 0 || h <= 0) return;
 
+#ifdef ASYNC_SCAN_BENCHMARK
+	MeasuredTreeLock lock(*this, LockMetricKind::Layout);
+#else
 	std::lock_guard<std::mutex> lock(m_treeMutex);
+#endif
 	if (m_rootFolder == nullptr || m_cancelled.load()) return;
 
 	try {

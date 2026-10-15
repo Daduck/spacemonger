@@ -5,7 +5,36 @@ incremental modernization rather than a full rewrite.
 
 ## Next
 
-- [ ] Benchmark live-layout mutex hold time and scan throughput before implementing incremental size propagation.
+- [x] Benchmark live-layout mutex hold time and scan throughput before implementing incremental size propagation.
+      The opt-in benchmark and run instructions are in
+      `docs/LIVE_SCAN_BENCHMARK.md`. On 2026-10-16, a Release x64 run on Windows
+      10.0 build 26300 (AMD64 Family 26 Model 68 Stepping 0, AuthenticAMD;
+      16 logical processors and 16 default scan workers) used 2,000 directories
+      × 1,000 files and three alternating scan-only/live-layout pairs. All six
+      samples matched the independent manifest: 2,000,000 files, 2,000 folders,
+      and 4,098,266,080 selected logical bytes. Each live sample made two
+      cadence-triggered layouts: an empty startup snapshot and one populated
+      snapshot (1,217–1,291 treemap nodes), for six calls total and three
+      populated calls. Median scan-only throughput was 4,820,087 files/s and
+      9,876,998,812 bytes/s (0.415 s); live layout was 4,742,164 files/s and
+      9,717,324,547 bytes/s (0.422 s), a −1.62% change and 7 ms longer median
+      wall time. Layout held the tree mutex for 5.820 ms total over six calls
+      (0.970 ms mean, 2.842 ms max; p95 bucket upper bound 2.097 ms) and waited
+      0.008 ms total (0.008 ms max; p95 upper bound 0.000128 ms).
+      Worker mutation totals were derived from the verified file+folder count:
+      6,006,000 acquisitions per mode across three runs. Instrumentation timed
+      one deterministic mutation in 256 per worker. Scan-only sampled 23,487
+      locks (79.523 ms wait, 3.386 µs mean, 0.600 ms max, p95 ≤16.384 µs; hold
+      4.846 ms total, 0.206 µs mean, 0.247 ms max, p95 ≤0.512 µs). Live sampled
+      23,492 locks (78.070 ms wait, 3.323 µs mean, 0.527 ms max, p95 ≤16.384 µs;
+      hold 5.000 ms total, 0.213 µs mean, 0.061 ms max, p95 ≤0.512 µs).
+      Fixture creation took 167.834 s, cleanup 66.304 s, and approximate
+      temp-volume free-space change was 7.765 GB. Defer incremental propagation:
+      the measured live-layout difference was 7 ms per scan on this host, while
+      populated layout lock hold averaged 1.94 ms per live sample. This result
+      is limited to this machine and deterministic fixture. Alternating order
+      reduces but does not remove cache/order effects; larger-than-2M and
+      real-drive workloads remain unverified.
 - [ ] Resolve existing x64 conversion warnings in DriveDialog.cpp and Freedoc.cpp.
 - [ ] Verify failed/partial-scan dialogs, cancellation, and mixed-DPI behavior interactively.
 
@@ -51,6 +80,7 @@ incremental modernization rather than a full rewrite.
 - [x] Store internal strings as `wchar_t*` instead of `char*` to eliminate `PathUtil::WideToAnsi` conversion overhead during scanning.
 - [ ] **Incremental Live-Scan Size Propagation (replace `ComputeLiveSizes` full-tree walk)**
       *Background:* `AsyncScanEngine::GenerateLiveLayout` calls `ComputeLiveSizes`, which recursively recomputes folder sizes for the entire partially scanned tree on every 250 ms render tick while holding `m_treeMutex` — an O(N) walk that blocks all scan workers for its duration. Fine for typical disks at 4 Hz, but on multi-million-file scans the walk grows linearly and increasingly stalls scanning. The fix is incremental propagation: have workers bubble size deltas up the parent chain (atomics or per-folder accumulation) as files are discovered, so the render tick only reads already-current sizes instead of recomputing them from scratch.
+      *Decision (2026-10-16):* Defer implementation based on the 2,000,000-file benchmark above: live layout changed median throughput by −1.62% and added 7 ms to median scan time; populated layout lock hold averaged about 1.94 ms per live sample. Revisit with larger varied fixtures or real-drive evidence. This run does not establish behavior for larger or real-drive workloads.
 - [ ] **Modernize `CFolder` Data Layout (Struct of Arrays -> Contiguous Structures)**
       *Background:* `CFolder` currently manages five separate heap-allocated pointer arrays (`names`, `children`, `sizes`, `actualsizes`, `times`) through manual `malloc`/`free` and reallocation in `MoreEntries()`. Refactoring this into a single contiguous struct (e.g., `struct FolderEntry`) or an arena-backed contiguous array improves CPU cache locality during treemap layout traversal and sorting passes, while replacing error-prone manual memory management with clean RAII semantics.
 - [x] Add a line-ending policy with `.gitattributes`.

@@ -14,6 +14,9 @@
 #include <condition_variable>
 #include <atomic>
 #include <memory>
+#ifdef ASYNC_SCAN_BENCHMARK
+#include <array>
+#endif
 #include "e.h"
 #include "StringArena.h"
 #include "TreemapLayout.h"
@@ -40,6 +43,18 @@ struct ScanProgress {
 	ui64 skippedDirectories;
 	unsigned long firstError;
 };
+
+#ifdef ASYNC_SCAN_BENCHMARK
+struct TreeLockMetricSnapshot {
+	ui64 count{0};
+	ui64 waitNanoseconds{0};
+	ui64 maxWaitNanoseconds{0};
+	ui64 holdNanoseconds{0};
+	ui64 maxHoldNanoseconds{0};
+	ui64 p95WaitNanoseconds{0};
+	ui64 p95HoldNanoseconds{0};
+};
+#endif
 
 class AsyncScanEngine {
 public:
@@ -74,6 +89,11 @@ public:
 		std::vector<TreemapNode>& outNodes,
 		std::vector<std::wstring>& outNameStorage
 	);
+#ifdef ASYNC_SCAN_BENCHMARK
+	unsigned int GetBenchmarkWorkerCount() const { return m_numThreads; }
+	TreeLockMetricSnapshot GetWorkerMutationLockMetrics() const;
+	TreeLockMetricSnapshot GetLayoutLockMetrics() const;
+#endif
 
 private:
 	void WorkerThread(size_t workerIndex);
@@ -122,6 +142,33 @@ private:
 	std::wstring m_latestPath;
 
 	mutable std::mutex m_treeMutex;
+
+#ifdef ASYNC_SCAN_BENCHMARK
+	struct BenchmarkLockMetrics {
+		ui64 count{0}, waitNanoseconds{0}, maxWaitNanoseconds{0};
+		ui64 holdNanoseconds{0}, maxHoldNanoseconds{0};
+		std::array<ui64, 64> waitHistogram{};
+		std::array<ui64, 64> holdHistogram{};
+	};
+	static TreeLockMetricSnapshot ReadMetrics(const BenchmarkLockMetrics& metrics);
+	enum class LockMetricKind { WorkerMutation, Layout };
+	class MeasuredTreeLock {
+	public:
+		MeasuredTreeLock(AsyncScanEngine& engine, LockMetricKind kind, size_t workerIndex = 0);
+		~MeasuredTreeLock();
+		MeasuredTreeLock(const MeasuredTreeLock&) = delete;
+		MeasuredTreeLock& operator=(const MeasuredTreeLock&) = delete;
+	private:
+		std::unique_lock<std::mutex> m_lock;
+		BenchmarkLockMetrics* m_metrics;
+		bool m_measure{false};
+		ui64 m_waitNanoseconds{0};
+		ui64 m_acquiredAt{0};
+	};
+	std::vector<BenchmarkLockMetrics> m_workerMutationMetrics;
+	std::vector<ui64> m_workerMutationSequences;
+	BenchmarkLockMetrics m_layoutMetrics;
+#endif
 
 	CFolder* m_rootFolder{nullptr};
 	CStringArena m_rootArena;
