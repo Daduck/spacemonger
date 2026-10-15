@@ -238,6 +238,12 @@ struct Sample {
 	ui64 layoutCalls{0};
 	ui64 nonEmptyLayoutCalls{0};
 	TreeLockMetricSnapshot workerLock, layoutLock;
+	struct LayoutObservation {
+		ui64 files{0}, folders{0}, bytes{0};
+		size_t treemapNodes{0};
+		bool populated{false};
+	};
+	std::vector<LayoutObservation> layoutObservations;
 };
 
 std::wstring ReadCpuIdentifier()
@@ -306,6 +312,8 @@ static Sample RunSample(const Fixture& fixture, unsigned int sampleIndex, bool l
 	TreemapConfig config;
 	ui64 layoutCalls = 0;
 	ui64 nonEmptyLayoutCalls = 0;
+	std::vector<Sample::LayoutObservation> layoutObservations;
+	layoutObservations.reserve(16);
 	ScanProgress lastRendered{};
 	lastRendered.numFiles = (ui64)-1;
 	lastRendered.numFolders = (ui64)-1;
@@ -330,10 +338,8 @@ static Sample RunSample(const Fixture& fixture, unsigned int sampleIndex, bool l
 				++layoutCalls;
 				bool nonEmpty = !nodes.empty();
 				if (nonEmpty) ++nonEmptyLayoutCalls;
-				std::printf("Layout sample=%u mode=%s call=%llu progress_files=%llu progress_folders=%llu progress_bytes=%llu treemap_nodes=%zu populated=%s\n",
-					sampleIndex, liveLayout ? "live-layout" : "scan-only", (unsigned long long)layoutCalls,
-					(unsigned long long)progress.numFiles, (unsigned long long)progress.numFolders,
-					(unsigned long long)progress.bytesScanned, nodes.size(), nonEmpty ? "yes" : "no");
+				layoutObservations.push_back({progress.numFiles, progress.numFolders,
+					progress.bytesScanned, nodes.size(), nonEmpty});
 			}
 		}
 		Sleep(15);
@@ -358,6 +364,7 @@ static Sample RunSample(const Fixture& fixture, unsigned int sampleIndex, bool l
 	sample.workerMutationAcquisitions = progress.numFiles + progress.numFolders;
 	sample.layoutCalls = layoutCalls;
 	sample.nonEmptyLayoutCalls = nonEmptyLayoutCalls;
+	sample.layoutObservations = std::move(layoutObservations);
 	sample.workerLock = engine.GetWorkerMutationLockMetrics();
 	sample.layoutLock = engine.GetLayoutLockMetrics();
 	if (sample.layoutLock.count != sample.layoutCalls)
@@ -373,12 +380,29 @@ static double Median(std::vector<double> values)
 	return values.size() % 2 ? values[values.size() / 2] : (values[values.size() / 2 - 1] + values[values.size() / 2]) / 2.0;
 }
 
-static ui64 MedianU64(std::vector<ui64> values)
+static ui64 UpperMedianU64(std::vector<ui64> values)
 {
 	std::sort(values.begin(), values.end());
 	if (values.empty()) return 0;
-	if (values.size() % 2) return values[values.size() / 2];
-	return (values[values.size() / 2 - 1] + values[values.size() / 2]) / 2;
+	return values[values.size() / 2];
+}
+
+static void VerifyUpperMedianSemantics()
+{
+	if (UpperMedianU64({1, 2, 8, 16}) != 8 || UpperMedianU64({1, 2, 8}) != 2)
+		throw std::logic_error("upper-median percentile selection check failed");
+}
+
+static void PrintLayoutObservations(const Sample& sample)
+{
+	for (size_t i = 0; i < sample.layoutObservations.size(); ++i) {
+		const auto& observation = sample.layoutObservations[i];
+		std::printf("Layout sample=%u mode=%ls call=%zu progress_files=%llu progress_folders=%llu progress_bytes=%llu treemap_nodes=%zu populated=%s\n",
+			sample.index, sample.mode.c_str(), i + 1,
+			(unsigned long long)observation.files, (unsigned long long)observation.folders,
+			(unsigned long long)observation.bytes, observation.treemapNodes,
+			observation.populated ? "yes" : "no");
+	}
 }
 
 static void PrintSummary(const char* label, const std::vector<Sample>& samples, bool live)
@@ -406,10 +430,10 @@ static void PrintSummary(const char* label, const std::vector<Sample>& samples, 
 		layoutWaitP95.push_back(sample.layoutLock.p95WaitNanoseconds);
 		layoutHoldP95.push_back(sample.layoutLock.p95HoldNanoseconds);
 	}
-	worker.p95WaitNanoseconds = MedianU64(workerWaitP95);
-	worker.p95HoldNanoseconds = MedianU64(workerHoldP95);
-	layout.p95WaitNanoseconds = MedianU64(layoutWaitP95);
-	layout.p95HoldNanoseconds = MedianU64(layoutHoldP95);
+	worker.p95WaitNanoseconds = UpperMedianU64(workerWaitP95);
+	worker.p95HoldNanoseconds = UpperMedianU64(workerHoldP95);
+	layout.p95WaitNanoseconds = UpperMedianU64(layoutWaitP95);
+	layout.p95HoldNanoseconds = UpperMedianU64(layoutHoldP95);
 	std::printf("%s median: wall_seconds=%.3f files_per_sec=%.0f bytes_per_sec=%.0f worker_mutation_acquisitions_total=%llu worker_mutations_sampled=%llu sampling=1/256 layout_calls_total=%llu non_empty_layout_calls=%llu\n", label,
 		Median(wallSeconds), Median(filesPerSecond), Median(bytesPerSecond), (unsigned long long)workerMutationAcquisitions,
 		(unsigned long long)worker.count, (unsigned long long)layoutCalls, (unsigned long long)nonEmptyLayoutCalls);
@@ -440,6 +464,7 @@ static Options ParseOptions(int argc, wchar_t** argv)
 int wmain(int argc, wchar_t** argv)
 {
 	try {
+		VerifyUpperMedianSemantics();
 		const Options options = ParseOptions(argc, argv);
 		Fixture fixture;
 		ui64 freeBeforeFixture = AvailableTempBytes();
@@ -478,6 +503,7 @@ int wmain(int argc, wchar_t** argv)
 					throw std::runtime_error("live-layout sample had zero cadence-triggered layouts; increase the fixture size");
 				if (live && sample.nonEmptyLayoutCalls == 0)
 					throw std::runtime_error("live-layout sample had no non-empty cadence-triggered layout; increase the fixture size");
+				PrintLayoutObservations(sample);
 				double filesPerSecond = sample.files / sample.seconds;
 				double bytesPerSecond = sample.bytes / sample.seconds;
 				std::printf("Sample %u %s: workers=%u wall_seconds=%.3f files_per_sec=%.0f bytes_per_sec=%.0f files=%llu folders=%llu logical_bytes=%llu worker_mutation_acquisitions_total=%llu worker_mutations_sampled=%llu sampling=1/256 layout_calls=%llu non_empty_layout_calls=%llu\n",

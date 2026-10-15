@@ -27,8 +27,8 @@ estimate that can include unrelated activity on the same volume. For a smaller
 deliberate probe, pass `--directories N`, `--files-per-directory N`, and/or
 `--samples N`; a live-layout sample that never reaches a cadence-triggered
 layout with treemap nodes is reported as an invalid run and returns nonzero.
-Each call logs progress files/folders/bytes, treemap node count, and whether
-the produced layout was non-empty.
+The benchmark stores compact progress and node-count data for each layout call
+during scanning, then prints those observations after the timed scan ends.
 
 Each scan uses the engine's default worker count. The live mode checks progress
 every 15 ms; the first render check is immediately eligible, matching
@@ -51,7 +51,8 @@ aggregated after the scan. Every layout lock is timed. Wait and hold statistics
 are cumulative, mean, maximum, and p95 upper bounds from fixed power-of-two
 nanosecond histogram buckets. Summary throughput is the median across runs for
 each mode; lock totals aggregate the corresponding runs and summary p95 is the
-median of per-run p95 bucket bounds. Worker wait and hold totals sum across
+upper median of per-run p95 bucket bounds, so it remains an observed bucket
+bound for even sample counts. Worker wait and hold totals sum across
 worker threads, so they can exceed the scan's wall duration.
 
 Results depend on CPU, storage, filesystem, antivirus/indexing activity, and
