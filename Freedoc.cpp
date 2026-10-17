@@ -55,7 +55,7 @@ void CFreeDoc::SetPathName(const CString &string)
 	m_strPathName = string;
 }
 
-UINT CFreeDoc::GetViewCount(void) const
+INT_PTR CFreeDoc::GetViewCount(void) const
 {
 	return(m_viewList.GetCount());
 }

@@ -185,7 +185,7 @@ public:
 	virtual BOOL IsModified(void) const;
 	virtual void SetModifiedFlag(const BOOL modified = TRUE);
 
-	virtual UINT GetViewCount(void) const;
+	virtual INT_PTR GetViewCount(void) const;
 	virtual void AddView(CFreeView *view);
 	virtual void RemoveView(CFreeView *view);
 	virtual POSITION GetFirstViewPosition(void) const;

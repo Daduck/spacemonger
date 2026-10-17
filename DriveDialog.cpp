@@ -3,6 +3,20 @@
 #include "DriveDialog.h"
 #include "Lang.h"
 
+namespace {
+
+int GetDriveIndex(CListCtrl *list, int item)
+{
+	const DWORD_PTR driveIndex = list->GetItemData(item);
+	if (driveIndex > static_cast<DWORD_PTR>('Z' - 'A')) {
+		ASSERT(FALSE);
+		return -1;
+	}
+	return static_cast<int>(driveIndex);
+}
+
+}
+
 CDriveDialog::CDriveDialog(CWnd* pParent)
 	: CDialog(IDD_OPEN_DIALOG, pParent)
 {
@@ -23,7 +37,7 @@ void CDriveDialog::OnDriveDblClk(NMHDR *pNotifyStruct, LRESULT *result)
 	int i, max = lc->GetItemCount();
 	for (i = 0; i < max; i++) {
 		if (lc->GetItemState(i, LVIS_SELECTED)) {
-			EndDialog(lc->GetItemData(i));
+			EndDialog(GetDriveIndex(lc, i));
 		}
 	}
 }
@@ -37,7 +51,7 @@ void CDriveDialog::OnOK()
 	int i, max = lc->GetItemCount();
 	for (i = 0; i < max; i++) {
 		if (lc->GetItemState(i, LVIS_SELECTED)) {
-			EndDialog(lc->GetItemData(i));
+			EndDialog(GetDriveIndex(lc, i));
 		}
 	}
 }
