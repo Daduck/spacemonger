@@ -27,7 +27,12 @@ jobs:
 
     - name: Test (x86 / x64)
       if: matrix.preset != 'vs2022-arm64'
-      run: ctest --preset ${{ matrix.preset }}-${{ matrix.configuration == 'Debug' && 'debug' || 'release' }}
+      run: ctest --preset ${{ matrix.preset }}-${{ matrix.configuration == 'Debug' && 'debug' || 'release' }} --timeout 120 --output-on-failure
+
+    # The unit tests never load the app's embedded manifest; this does.
+    # ARM64 cannot run on the x64 runner, so only its manifest is checked.
+    - name: Smoke test (app starts)
+      run: .\tools\smoke-test.ps1 -Path build/${{ matrix.preset }}/${{ matrix.configuration }}/SpaceMonger.exe ${{ matrix.preset == 'vs2022-arm64' && '-ManifestOnly' || '' }}
 
     - name: Upload release executable
       if: matrix.configuration == 'Release'
