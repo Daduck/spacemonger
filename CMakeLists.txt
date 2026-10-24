@@ -54,9 +54,10 @@ set(SPACEMONGER_SOURCES
 # and would also enable MFC on every test target declared below.
 add_executable(SpaceMonger WIN32 ${SPACEMONGER_SOURCES})
 set_property(TARGET SpaceMonger PROPERTY VS_GLOBAL_UseOfMfc "Static")
-# SpaceMonger.manifest declares DPI awareness itself. Without this, the v143
-# manifest tool adds a second <dpiAware> element and Windows refuses to start
-# the merged manifest ("side-by-side configuration is incorrect").
+# SpaceMonger.manifest declares DPI awareness itself. With UseOfMfc=Static,
+# MSBuild defaults EnableDpiAwareness on and merges its own dpiaware.manifest,
+# adding a second <dpiAware> element that makes Windows refuse to start the
+# app ("side-by-side configuration is incorrect").
 set_property(TARGET SpaceMonger PROPERTY VS_DPI_AWARE "OFF")
 target_include_directories(SpaceMonger PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(SpaceMonger PRIVATE WIN32 _WINDOWS UNICODE _UNICODE)

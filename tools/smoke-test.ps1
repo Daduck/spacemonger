@@ -30,18 +30,22 @@ param(
 $ErrorActionPreference = 'Stop'
 
 if (-not (Test-Path -LiteralPath $Path)) { throw "File not found: $Path" }
+$fullPath = (Resolve-Path -LiteralPath $Path).ProviderPath
 
 # The embedded RT_MANIFEST resource is plain UTF-8 XML inside the PE file.
-$bytes = [IO.File]::ReadAllBytes((Resolve-Path -LiteralPath $Path))
-$text = [Text.Encoding]::UTF8.GetString($bytes)
-$start = $text.IndexOf('<assembly')
+# Search ordinally: under pwsh's ICU globalization NUL is ignorable, so a
+# culture-sensitive IndexOf would also match UTF-16 "<assembly" text.
+$text = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($fullPath))
+$start = $text.IndexOf('<assembly', [StringComparison]::Ordinal)
 if ($start -lt 0) { throw "No embedded application manifest found in $Path" }
-$end = $text.IndexOf('</assembly>', $start)
+$end = $text.IndexOf('</assembly>', $start, [StringComparison]::Ordinal)
 if ($end -lt 0) { throw "Embedded manifest in $Path is not terminated." }
 $manifest = $text.Substring($start, $end - $start + '</assembly>'.Length)
 
+# mt.exe may write merged elements with a namespace prefix
+# (e.g. <ms_windowsSettings:dpiAware>), so allow one.
 foreach ($element in 'dpiAware', 'dpiAwareness', 'longPathAware', 'requestedExecutionLevel') {
-  $count = ([regex]::Matches($manifest, "<$element[\s>/]")).Count
+  $count = ([regex]::Matches($manifest, "<(?:[\w.-]+:)?$element[\s>/]")).Count
   if ($count -gt 1) {
     throw "Embedded manifest has $count <$element> elements; Windows will refuse to start it.`n$manifest"
   }
@@ -50,7 +54,7 @@ Write-Host "Embedded manifest OK: $Path"
 if ($ManifestOnly) { return }
 
 try {
-  $process = Start-Process -FilePath $Path -PassThru
+  $process = Start-Process -FilePath $fullPath -PassThru
 } catch {
   throw "Windows could not start ${Path}: $($_.Exception.Message)"
 }

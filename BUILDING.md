@@ -71,6 +71,14 @@ Run with a bounded timeout when investigating hangs:
 ctest --preset vs2022-x64-debug --timeout 60
 ```
 
+The tests never load the application's embedded manifest, so CI also runs a
+smoke test that rejects duplicate manifest settings and checks that
+SpaceMonger.exe starts (ARM64: manifest check only). Run it locally with:
+
+```powershell
+.\tools\smoke-test.ps1 -Path build/vs2022-x64/Release/SpaceMonger.exe
+```
+
 Automated checks do not replace interactive verification of scanning dialogs,
 mixed-DPI rendering, and shell operations. Release builds use the static runtime
 and are distributed as a single SpaceMonger.exe.
