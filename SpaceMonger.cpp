@@ -489,8 +489,8 @@ void CCurrentSettings::Load(void)
 
 	// Find the language in the list of languages.  If it's not found,
 	// try US English.
-	lang[0] = tolower(lang[0]);
-	lang[1] = tolower(lang[1]);
+	lang[0] = (char)tolower((unsigned char)lang[0]);
+	lang[1] = (char)tolower((unsigned char)lang[1]);
 	lang[2] = '\0';
 	lang[3] = '\0';
 	int i;

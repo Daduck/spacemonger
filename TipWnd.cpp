@@ -136,6 +136,7 @@ static LRESULT CALLBACK TipWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 	case WM_CREATE:
 		info = (TipWndInfo *)malloc(sizeof(TipWndInfo));
 		if (!info) return -1;
+		memset(info, 0, sizeof(*info));
 		info->icon = NULL;
 		info->text = NULL;
 		info->textlen = 0;
@@ -761,16 +762,22 @@ void CTipWnd::PushOnScreen(void)
 {
 	CRect rect;
 	GetWindowRect(&rect);
-	short int scrnwidth = GetSystemMetrics(SM_CXSCREEN);
-	short int scrnheight = GetSystemMetrics(SM_CYSCREEN);
-	if (rect.right > scrnwidth)
-		rect.left -= rect.right-scrnwidth, rect.right = scrnwidth;
-	if (rect.bottom > scrnheight)
-		rect.top -= rect.bottom-scrnheight, rect.top = scrnheight;
-	if (rect.left < 0)
-		rect.right -= 0-rect.left, rect.left = 0;
-	if (rect.top < 0)
-		rect.bottom -= 0-rect.top, rect.top = 0;
+	// Clamp to the work area of the monitor the tip is on (not just the primary one).
+	MONITORINFO mi;
+	mi.cbSize = sizeof(mi);
+	if (!GetMonitorInfoW(MonitorFromRect(&rect, MONITOR_DEFAULTTONEAREST), &mi)) {
+		mi.rcWork.left = mi.rcWork.top = 0;
+		mi.rcWork.right = GetSystemMetrics(SM_CXSCREEN);
+		mi.rcWork.bottom = GetSystemMetrics(SM_CYSCREEN);
+	}
+	if (rect.right > mi.rcWork.right)
+		rect.left -= rect.right-mi.rcWork.right, rect.right = mi.rcWork.right;
+	if (rect.bottom > mi.rcWork.bottom)
+		rect.top -= rect.bottom-mi.rcWork.bottom, rect.bottom = mi.rcWork.bottom;
+	if (rect.left < mi.rcWork.left)
+		rect.right += mi.rcWork.left-rect.left, rect.left = mi.rcWork.left;
+	if (rect.top < mi.rcWork.top)
+		rect.bottom += mi.rcWork.top-rect.top, rect.top = mi.rcWork.top;
 	SetWindowPos(NULL, rect.left, rect.top, rect.right-rect.left, rect.bottom-rect.top,
 		SWP_NOACTIVATE|SWP_NOZORDER|SWP_NOSIZE);
 }

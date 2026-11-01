@@ -37,7 +37,7 @@ void CSettingsDialog::OnCancel(void)
 void CSettingsDialog::OnOK(void)
 {
 	CComboBox *density = (CComboBox *)GetDlgItem(IDC_DENSITY);
-	if (density != NULL)
+	if (density != NULL && density->GetCurSel() != CB_ERR)
 		theApp.m_settings.density = density->GetCurSel()-3;
 	CComboBox *file_color = (CComboBox *)GetDlgItem(IDC_FILE_COLOR);
 	if (file_color != NULL)
@@ -155,6 +155,7 @@ void CSettingsDialog::OnLang(void)
 	CComboBox *lang = (CComboBox *)GetDlgItem(IDC_LANG);
 	if (lang == NULL) return;
 	int index = lang->GetCurSel();
+	if (index < 0 || Langs[index].abbrev == NULL) return;
 	theApp.m_settings.lang[0] = Langs[index].abbrev[0];
 	theApp.m_settings.lang[1] = Langs[index].abbrev[1];
 	theApp.m_settings.lang[2] = '\0';

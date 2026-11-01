@@ -270,6 +270,8 @@ void AsyncScanEngine::ScanSubtree(size_t workerIndex, CFolder* folder, std::wstr
 			DWORD attributes = GetFileAttributesW(path.c_str());
 			if (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY)) return;
 		}
+		// A user cancel aborts the enumeration (CancelSynchronousIo); that is not a scan failure.
+		if (m_cancelled.load()) return;
 		RecordScanError(enumerationError, depth == 0, path);
 		return;
 	}
