@@ -92,6 +92,8 @@ protected:
 	// nodes outlive the scan engine's arenas (e.g. on a cancelled scan).
 	std::vector<std::wstring> m_liveNameStorage;
 	CTipWnd m_infotipwnd;
+	// Icon currently shown in the info tip; owned here (SHGFI_ICON hands ownership to the caller).
+	HICON m_tipIcon = NULL;
 	CTipWnd m_nametipwnd;
 	const TreemapNode *lastcur;
 

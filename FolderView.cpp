@@ -243,6 +243,7 @@ void CFolderView::OnDestroy()
 
 	m_infotipwnd.DestroyWindow();
 	m_nametipwnd.DestroyWindow();
+	if (m_tipIcon != NULL) { ::DestroyIcon(m_tipIcon); m_tipIcon = NULL; }
 
 	CFreeView::OnDestroy();
 }
@@ -424,6 +425,8 @@ void CFolderView::SetupInfoTip(const TreemapNode *cur)
 		SHGetFileInfoW(widePath.c_str(), 0,
 			&fileinfo, sizeof(SHFILEINFOW), SHGFI_DISPLAYNAME|SHGFI_ICON);
 		m_infotipwnd.SetIcon(fileinfo.hIcon, 1);
+		if (m_tipIcon != NULL) ::DestroyIcon(m_tipIcon);
+		m_tipIcon = fileinfo.hIcon;
 		m_infotipwnd.SetIconPos(TW_LEFT);
 	}
 
